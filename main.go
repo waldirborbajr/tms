@@ -15,8 +15,8 @@ import (
 // ==================== Build Information ====================
 
 var (
-	// These values will be injected during build
-	Version   = "0.1.0"
+	// These will be injected at build time via ldflags
+	Version   = "dev"          // default value
 	GitCommit = "unknown"
 	BuildTime = "unknown"
 )
