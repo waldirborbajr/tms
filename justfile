@@ -169,18 +169,18 @@ release-clean:
 release:
     @echo "=== Preparing release v{{version}} ==="
     just pre-commit
-    just version-bump patch  # Optional: auto bump patch before release (remove if you prefer manual)
-    
-    @echo "📦 Committing version bump..."
+   
+    @echo "📦 Committing version file (if changed)..."
     git add {{VERSION_FILE}} go.mod go.sum
-    git commit -m "chore: release v{{version}}" || echo "→ No changes to commit"
-    
+    git commit -m "chore: release v{{version}}" \
+        || echo "→ No changes to commit"
+   
     @echo "🏷️ Creating annotated tag v{{version}}..."
     git tag -a "v{{version}}" -m "Release v{{version}}"
-    
+   
     @echo "⬆️ Pushing to GitHub..."
     git push origin main --follow-tags
-    
+   
     @echo ""
     @echo "🎉 Release v{{version}} prepared successfully!"
 
