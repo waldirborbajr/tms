@@ -58,7 +58,7 @@ build:
         -X main.GitCommit=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown') \
         -X main.BuildTime=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
         -o {{BIN}} .
-    @echo "✅ Build completed: {{BIN}}"
+    @echo "✅ Build completed: {{BIN}} (v{{version}})"
 
 run:
     @echo "🚀 Running tms..."
