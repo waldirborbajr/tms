@@ -1,4 +1,9 @@
 # tms
+
+<p align="center">
+  <img width="256" height="256" src="./assets/tms-logo.png" />
+</p>
+
 Tmux Session Manager
 
 ```
