@@ -5,13 +5,21 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/alecthomas/kong"
 )
 
-var Version = "1.2.0" // Change this when you release new versions
+// ==================== Build Information ====================
+
+var (
+	// These values will be injected during build
+	Version   = "0.1.0"
+	GitCommit = "unknown"
+	BuildTime = "unknown"
+)
 
 // ====================== Tmux Helper ======================
 
@@ -97,12 +105,11 @@ func (m killModel) View() string {
 	}
 
 	var s strings.Builder
-
 	s.WriteString(titleStyle.Render("Kill Tmux Session") + "\n\n")
 
 	for i, session := range m.sessions {
 		if i == m.cursor {
-			s.WriteString(selectedStyle.Render(" → " + session) + "\n")
+			s.WriteString(selectedStyle.Render(" → "+session) + "\n")
 		} else {
 			s.WriteString(itemStyle.Render("   "+session) + "\n")
 		}
@@ -112,15 +119,15 @@ func (m killModel) View() string {
 	return s.String()
 }
 
-// ====================== CLI Structure with Kong ======================
+// ====================== CLI Structure ======================
 
 type CLI struct {
-	List   ListCmd   `cmd:"" help:"List active tmux sessions"`
-	New    NewCmd    `cmd:"" help:"Create a new tmux session"`
-	Attach AttachCmd `cmd:"" help:"Attach to a tmux session"`
-	Kill   KillCmd   `cmd:"" aliases:"k" help:"Kill a tmux session"`
-	Rename RenameCmd `cmd:"" aliases:"r" help:"Rename a tmux session"`
-	Version VersionCmd `cmd:"" help:"Show version"`
+	List    ListCmd    `cmd:"" help:"List active tmux sessions"`
+	New     NewCmd     `cmd:"" help:"Create a new tmux session"`
+	Attach  AttachCmd  `cmd:"" help:"Attach to a tmux session"`
+	Kill    KillCmd    `cmd:"" aliases:"k" help:"Kill a tmux session"`
+	Rename  RenameCmd  `cmd:"" aliases:"r" help:"Rename a tmux session"`
+	Version VersionCmd `cmd:"" help:"Show version and build information"`
 }
 
 type ListCmd struct{}
@@ -160,6 +167,8 @@ func (c ListCmd) Run() error {
 
 func (c VersionCmd) Run() error {
 	fmt.Printf("tms version %s\n", Version)
+	fmt.Printf("Git Commit : %s\n", GitCommit)
+	fmt.Printf("Built      : %s\n", BuildTime)
 	return nil
 }
 
@@ -217,9 +226,7 @@ func main() {
 		kong.Name("tms"),
 		kong.Description("Simple and lightweight Tmux session manager"),
 		kong.UsageOnError(),
-		kong.ConfigureHelp(kong.HelpOptions{
-			Compact: true,
-		}),
+		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
 	)
 
 	err := ctx.Run()
