@@ -85,17 +85,20 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			switch menuOptions[m.cursor] {
 			case "New Session":
-				// Por enquanto sai e usa tmux prompt (melhoraremos depois)
 				runTmux("command-prompt", "-p", "New session name:", "new-session -s '%%'")
 				return m, tea.Quit
+
 			case "Switch Session":
 				runTmux("choose-session")
 				return m, tea.Quit
+
 			case "Kill Session":
 				return initialKillModel(), nil
+
 			case "Rename Session":
 				runTmux("command-prompt", "-I", "#S", "-p", "New name:", "rename-session '%%'")
 				return m, tea.Quit
+
 			case "List Sessions":
 				sessions := listSessions()
 				if len(sessions) == 0 {
@@ -106,12 +109,19 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						fmt.Printf(" • %s\n", s)
 					}
 				}
+				fmt.Println("\nPress Enter to return...")
+				// Simple pause
+				fmt.Scanln()
 				return m, tea.Quit
+
 			case "Show Version":
 				fmt.Printf("tms version %s\n", Version)
 				fmt.Printf("Git Commit : %s\n", GitCommit)
 				fmt.Printf("Built      : %s\n", BuildTime)
+				fmt.Println("\nPress Enter to return...")
+				fmt.Scanln()
 				return m, tea.Quit
+
 			case "Quit":
 				return m, tea.Quit
 			}
@@ -154,6 +164,7 @@ func (m killModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
 			return initialMenuModel(), nil
+
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -162,12 +173,15 @@ func (m killModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.sessions)-1 {
 				m.cursor++
 			}
+
 		case "enter":
 			if len(m.sessions) > 0 {
 				selected := m.sessions[m.cursor]
 				_, err := runTmux("kill-session", "-t", selected)
 				if err == nil {
 					tmuxDisplay("Killed session: " + selected)
+				} else {
+					tmuxDisplay("Failed to kill session")
 				}
 			}
 			return initialMenuModel(), nil
@@ -196,7 +210,7 @@ func (m killModel) View() string {
 	return s.String()
 }
 
-// ====================== CLI Commands (mantidos) ======================
+// ====================== CLI Commands ======================
 type CLI struct {
 	New     NewCmd     `cmd:"" help:"Create a new session"`
 	Switch  SwitchCmd  `cmd:"" aliases:"s" help:"Switch to a session"`
@@ -204,6 +218,7 @@ type CLI struct {
 	Rename  RenameCmd  `cmd:"" aliases:"r" help:"Rename a session"`
 	List    ListCmd    `cmd:"" help:"List active sessions"`
 	Version VersionCmd `cmd:"" help:"Show version"`
+	// Attach removido do menu principal (pode ser usado via CLI se quiser)
 }
 
 type ListCmd struct{}
@@ -217,7 +232,7 @@ type RenameCmd struct {
 	New string `arg:"" name:"new"`
 }
 
-// Command implementations
+// ====================== Command Implementations ======================
 func (c ListCmd) Run() error {
 	sessions := listSessions()
 	if len(sessions) == 0 {
@@ -243,7 +258,6 @@ func (c NewCmd) Run() error {
 	if name == "" {
 		name = "main"
 	}
-	fmt.Printf("Creating session: %s\n", name)
 	_, err := runTmux("new-session", "-d", "-s", name)
 	if err != nil {
 		tmuxDisplay("Failed to create session")
@@ -256,8 +270,7 @@ func (c NewCmd) Run() error {
 
 func (c SwitchCmd) Run() error {
 	if c.Name == "" {
-		// Interactive switch (future enhancement)
-		fmt.Println("Switch command without name not implemented yet.")
+		fmt.Println("Use 'tms switch <name>' or use the interactive menu.")
 		return nil
 	}
 	_, err := runTmux("switch-client", "-t", c.Name)
@@ -269,22 +282,15 @@ func (c SwitchCmd) Run() error {
 	return nil
 }
 
-func (c AttachCmd) Run() error {
-	fmt.Printf("Attaching to session: %s\n", c.Name)
-	return runTmux("attach-session", "-t", c.Name)
-}
-
 func (c KillCmd) Run() error {
 	if c.Name == "" {
-		// Interactive mode
 		p := tea.NewProgram(initialKillModel())
 		if _, err := p.Run(); err != nil {
-			fmt.Printf("Error running interactive kill: %v\n", err)
+			fmt.Printf("Error: %v\n", err)
 		}
 		return nil
 	}
 
-	// Direct kill
 	_, err := runTmux("kill-session", "-t", c.Name)
 	if err != nil {
 		tmuxDisplay(fmt.Sprintf("Failed to kill '%s'", c.Name))
@@ -306,7 +312,7 @@ func (c RenameCmd) Run() error {
 
 // ====================== Main ======================
 func main() {
-	// Se algum argumento for passado → modo CLI (mantém compatibilidade)
+	// CLI mode (quando passa argumentos)
 	if len(os.Args) > 1 {
 		var cli CLI
 		ctx := kong.Parse(&cli,
@@ -323,7 +329,7 @@ func main() {
 		return
 	}
 
-	// Sem argumentos → abre o menu interativo
+	// Menu interativo (sem argumentos)
 	p := tea.NewProgram(initialMenuModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v\n", err)
