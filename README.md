@@ -40,4 +40,15 @@ just version-bump minor     # 1.2.3 → 1.3.0
 just version-bump major     # 1.2.3 → 2.0.0
 ```
 
+```
+bind-key t run-shell "tms"                    # Menu principal (futuro)
+bind-key C run-shell "tms new"                # Nova sessão
+bind-key s run-shell "tms switch"             # Switch (melhor que attach)
+bind-key K run-shell "tms kill"               # Kill interativo
+bind-key R command-prompt -I "#S" -p "New name: " "run-shell 'tms rename \"#S\" \"%%\"'"
+bind-key L run-shell "tms list"
+```
+
+
+
 
