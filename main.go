@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/alecthomas/kong"
@@ -17,6 +19,55 @@ var (
 	GitCommit = "unknown"
 	BuildTime = "unknown"
 )
+
+// ====================== Config ======================
+type Config struct {
+	DefaultSession   string `toml:"default_session"`
+	DefaultDirectory string `toml:"default_directory"`
+	AutoSwitch       bool   `toml:"auto_switch"`
+	Theme            string `toml:"theme"`
+}
+
+var config Config
+
+func loadConfig() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		config = defaultConfig()
+		return
+	}
+
+	configDir := filepath.Join(home, ".config", "tms")
+	configPath := filepath.Join(configDir, "config.toml")
+
+	// Create default config if it doesn't exist
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		os.MkdirAll(configDir, 0755)
+		defaultContent := `# TMS - Tmux Session Manager Configuration
+
+default_session = "main"
+default_directory = ""          # Example: "/home/user/projects"
+auto_switch = true
+theme = "default"
+`
+		os.WriteFile(configPath, []byte(defaultContent), 0644)
+		fmt.Println("Created default config at:", configPath)
+	}
+
+	// Load config
+	if _, err := toml.DecodeFile(configPath, &config); err != nil {
+		config = defaultConfig()
+	}
+}
+
+func defaultConfig() Config {
+	return Config{
+		DefaultSession:   "main",
+		DefaultDirectory: "",
+		AutoSwitch:       true,
+		Theme:            "default",
+	}
+}
 
 // ====================== Tmux Helper ======================
 func runTmux(args ...string) (string, error) {
@@ -81,9 +132,15 @@ func (m textInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			switch m.action {
 			case "new":
-				_, _ = runTmux("new-session", "-d", "-s", m.value)
-				runTmux("switch-client", "-t", m.value)
-				tmuxDisplay("Created: " + m.value)
+				cmd := []string{"new-session", "-d", "-s", m.value}
+				if config.DefaultDirectory != "" {
+					cmd = append(cmd, "-c", config.DefaultDirectory)
+				}
+				_, _ = runTmux(cmd...)
+				if config.AutoSwitch {
+					runTmux("switch-client", "-t", m.value)
+				}
+				tmuxDisplay("Created session: " + m.value)
 			case "rename":
 				if m.oldName != "" {
 					_, _ = runTmux("rename-session", "-t", m.oldName, m.value)
@@ -108,7 +165,7 @@ func (m textInputModel) View() string {
 	var s strings.Builder
 	s.WriteString(titleStyle.Render("✏️ "+m.prompt) + "\n\n")
 	s.WriteString(inputStyle.Render(" > "+m.value+"█") + "\n\n")
-	s.WriteString(helpStyle.Render("Type • Enter = confirm • Esc = cancel"))
+	s.WriteString(helpStyle.Render("Type name • Enter = confirm • Esc = cancel"))
 	return s.String()
 }
 
@@ -124,6 +181,7 @@ var menuOptions = []string{
 	"Rename Current Session",
 	"List Sessions",
 	"Show Version",
+	"Show Config",
 	"Quit",
 }
 
@@ -174,6 +232,14 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				fmt.Printf("tms version %s\n", Version)
 				fmt.Printf("Git Commit : %s\n", GitCommit)
 				fmt.Printf("Built      : %s\n", BuildTime)
+				fmt.Scanln()
+				return m, nil
+			case "Show Config":
+				fmt.Println("=== TMS Configuration ===")
+				fmt.Printf("Default Session   : %s\n", config.DefaultSession)
+				fmt.Printf("Default Directory : %s\n", config.DefaultDirectory)
+				fmt.Printf("Auto Switch       : %v\n", config.AutoSwitch)
+				fmt.Printf("Theme             : %s\n", config.Theme)
 				fmt.Scanln()
 				return m, nil
 			case "Quit":
@@ -262,15 +328,18 @@ func (m switchModel) View() string {
 
 // ====================== Kill Multiple Model ======================
 type killModel struct {
-	sessions  []string
-	selected  map[string]bool
-	cursor    int
+	sessions []string
+	selected map[string]bool
+	cursor   int
 }
 
 func initialKillModel() killModel {
 	sessions := listSessions()
-	selected := make(map[string]bool)
-	return killModel{sessions: sessions, selected: selected, cursor: 0}
+	return killModel{
+		sessions: sessions,
+		selected: make(map[string]bool),
+		cursor:   0,
+	}
 }
 
 func (m killModel) Init() tea.Cmd { return nil }
@@ -296,8 +365,8 @@ func (m killModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "enter":
 			killed := 0
-			for sess, isSelected := range m.selected {
-				if isSelected {
+			for sess, sel := range m.selected {
+				if sel {
 					_, _ = runTmux("kill-session", "-t", sess)
 					killed++
 				}
@@ -338,18 +407,20 @@ func (m killModel) View() string {
 	return s.String()
 }
 
-// ====================== CLI Commands ======================
+// ====================== CLI Structure ======================
 type CLI struct {
 	New     NewCmd     `cmd:"" help:"Create a new session"`
 	Switch  SwitchCmd  `cmd:"" aliases:"s" help:"Switch to a session"`
-	Kill    KillCmd    `cmd:"" aliases:"k" help:"Kill a session (empty = interactive)"`
+	Kill    KillCmd    `cmd:"" aliases:"k" help:"Kill a session"`
 	Rename  RenameCmd  `cmd:"" aliases:"r" help:"Rename a session"`
 	List    ListCmd    `cmd:"" help:"List active sessions"`
 	Version VersionCmd `cmd:"" help:"Show version"`
+	Config  ConfigCmd  `cmd:"" help:"Show current configuration"`
 }
 
 type ListCmd struct{}
 type VersionCmd struct{}
+type ConfigCmd struct{}
 type NewCmd struct{ Name string `arg:"" optional:"" help:"Session name"` }
 type SwitchCmd struct{ Name string `arg:"" optional:"" help:"Session name"` }
 type KillCmd struct{ Name string `arg:"" optional:"" help:"Session name"` }
@@ -379,24 +450,39 @@ func (c VersionCmd) Run() error {
 	return nil
 }
 
+func (c ConfigCmd) Run() error {
+	fmt.Println("=== TMS Configuration ===")
+	fmt.Printf("Default Session   : %s\n", config.DefaultSession)
+	fmt.Printf("Default Directory : %s\n", config.DefaultDirectory)
+	fmt.Printf("Auto Switch       : %v\n", config.AutoSwitch)
+	fmt.Printf("Theme             : %s\n", config.Theme)
+	return nil
+}
+
 func (c NewCmd) Run() error {
 	name := c.Name
 	if name == "" {
-		name = "main"
+		name = config.DefaultSession
 	}
-	_, err := runTmux("new-session", "-d", "-s", name)
+	cmd := []string{"new-session", "-d", "-s", name}
+	if config.DefaultDirectory != "" {
+		cmd = append(cmd, "-c", config.DefaultDirectory)
+	}
+	_, err := runTmux(cmd...)
 	if err != nil {
 		tmuxDisplay("Failed to create session")
 		return err
 	}
-	tmuxDisplay(fmt.Sprintf("Created session: %s", name))
-	runTmux("switch-client", "-t", name)
+	if config.AutoSwitch {
+		runTmux("switch-client", "-t", name)
+	}
+	tmuxDisplay("Created session: " + name)
 	return nil
 }
 
 func (c SwitchCmd) Run() error {
 	if c.Name == "" {
-		fmt.Println("Usage: tms switch <name>  or use interactive menu")
+		fmt.Println("Usage: tms switch <name>")
 		return nil
 	}
 	_, err := runTmux("switch-client", "-t", c.Name)
@@ -438,6 +524,8 @@ func (c RenameCmd) Run() error {
 
 // ====================== Main ======================
 func main() {
+	loadConfig()
+
 	if len(os.Args) > 1 {
 		var cli CLI
 		ctx := kong.Parse(&cli,
