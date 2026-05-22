@@ -28,3 +28,10 @@ go build -ldflags="-s -w \
   -o tms
 ```
 
+```
+just build          # ou just b
+just release-local  # instala localmente
+just version        # não existe ainda, mas você pode usar ./bin/tms version
+```
+
+
