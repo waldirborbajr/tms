@@ -33,6 +33,15 @@ func listSessions() []string {
 	return strings.Split(output, "\n")
 }
 
+func getSessionInfo(session string) string {
+	windows, _ := runTmux("list-windows", "-t", session, "-F", "#{window_index}")
+	count := len(strings.Split(strings.TrimSpace(windows), "\n"))
+	if count == 1 && windows == "" {
+		count = 0
+	}
+	return fmt.Sprintf("%d windows", count)
+}
+
 func tmuxDisplay(message string) {
 	runTmux("display-message", message)
 }
@@ -48,19 +57,14 @@ var (
 
 // ====================== Text Input Model ======================
 type textInputModel struct {
-	prompt   string
-	value    string
-	action   string // "new" or "rename"
-	oldName  string
+	prompt  string
+	value   string
+	action  string
+	oldName string
 }
 
 func initialTextInput(prompt, action, oldName string) textInputModel {
-	return textInputModel{
-		prompt:  prompt,
-		value:   "",
-		action:  action,
-		oldName: oldName,
-	}
+	return textInputModel{prompt: prompt, value: "", action: action, oldName: oldName}
 }
 
 func (m textInputModel) Init() tea.Cmd { return nil }
@@ -79,7 +83,7 @@ func (m textInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "new":
 				_, _ = runTmux("new-session", "-d", "-s", m.value)
 				runTmux("switch-client", "-t", m.value)
-				tmuxDisplay("Created session: " + m.value)
+				tmuxDisplay("Created: " + m.value)
 			case "rename":
 				if m.oldName != "" {
 					_, _ = runTmux("rename-session", "-t", m.oldName, m.value)
@@ -103,8 +107,8 @@ func (m textInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m textInputModel) View() string {
 	var s strings.Builder
 	s.WriteString(titleStyle.Render("✏️ "+m.prompt) + "\n\n")
-	s.WriteString(inputStyle.Render(" > " + m.value + "█") + "\n\n")
-	s.WriteString(helpStyle.Render("Type name • Enter = confirm • Esc = cancel"))
+	s.WriteString(inputStyle.Render(" > "+m.value+"█") + "\n\n")
+	s.WriteString(helpStyle.Render("Type • Enter = confirm • Esc = cancel"))
 	return s.String()
 }
 
@@ -116,7 +120,7 @@ type menuModel struct {
 var menuOptions = []string{
 	"New Session",
 	"Switch Session",
-	"Kill Session",
+	"Kill Sessions",
 	"Rename Current Session",
 	"List Sessions",
 	"Show Version",
@@ -135,7 +139,6 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
-
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -144,14 +147,13 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(menuOptions)-1 {
 				m.cursor++
 			}
-
 		case "enter":
 			switch menuOptions[m.cursor] {
 			case "New Session":
 				return initialTextInput("New Session Name", "new", ""), nil
 			case "Switch Session":
 				return initialSwitchModel(), nil
-			case "Kill Session":
+			case "Kill Sessions":
 				return initialKillModel(), nil
 			case "Rename Current Session":
 				current, _ := runTmux("display-message", "-p", "#S")
@@ -163,7 +165,7 @@ func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					fmt.Println("Active sessions:")
 					for _, s := range sessions {
-						fmt.Printf(" • %s\n", s)
+						fmt.Printf(" • %s (%s)\n", s, getSessionInfo(s))
 					}
 				}
 				fmt.Scanln()
@@ -245,10 +247,12 @@ func (m switchModel) View() string {
 	s.WriteString(titleStyle.Render("🔄 Switch Session") + "\n\n")
 
 	for i, session := range m.sessions {
+		info := getSessionInfo(session)
+		line := fmt.Sprintf("%s (%s)", session, info)
 		if i == m.cursor {
-			s.WriteString(selectedStyle.Render(" → "+session) + "\n")
+			s.WriteString(selectedStyle.Render(" → "+line) + "\n")
 		} else {
-			s.WriteString(itemStyle.Render("   "+session) + "\n")
+			s.WriteString(itemStyle.Render("   "+line) + "\n")
 		}
 	}
 
@@ -256,14 +260,17 @@ func (m switchModel) View() string {
 	return s.String()
 }
 
-// ====================== Kill Model ======================
+// ====================== Kill Multiple Model ======================
 type killModel struct {
-	sessions []string
-	cursor   int
+	sessions  []string
+	selected  map[string]bool
+	cursor    int
 }
 
 func initialKillModel() killModel {
-	return killModel{sessions: listSessions(), cursor: 0}
+	sessions := listSessions()
+	selected := make(map[string]bool)
+	return killModel{sessions: sessions, selected: selected, cursor: 0}
 }
 
 func (m killModel) Init() tea.Cmd { return nil }
@@ -282,13 +289,21 @@ func (m killModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.sessions)-1 {
 				m.cursor++
 			}
-		case "enter":
+		case " ":
 			if len(m.sessions) > 0 {
-				selected := m.sessions[m.cursor]
-				_, err := runTmux("kill-session", "-t", selected)
-				if err == nil {
-					tmuxDisplay("Killed: " + selected)
+				sess := m.sessions[m.cursor]
+				m.selected[sess] = !m.selected[sess]
+			}
+		case "enter":
+			killed := 0
+			for sess, isSelected := range m.selected {
+				if isSelected {
+					_, _ = runTmux("kill-session", "-t", sess)
+					killed++
 				}
+			}
+			if killed > 0 {
+				tmuxDisplay(fmt.Sprintf("Killed %d session(s)", killed))
 			}
 			return initialMenuModel(), nil
 		}
@@ -302,27 +317,34 @@ func (m killModel) View() string {
 	}
 
 	var s strings.Builder
-	s.WriteString(titleStyle.Render("🗑️ Kill Session") + "\n\n")
+	s.WriteString(titleStyle.Render("🗑️ Kill Sessions (Multiple)") + "\n\n")
 
 	for i, session := range m.sessions {
+		info := getSessionInfo(session)
+		check := " "
+		if m.selected[session] {
+			check = "✓"
+		}
+		line := fmt.Sprintf("[%s] %s (%s)", check, session, info)
+
 		if i == m.cursor {
-			s.WriteString(selectedStyle.Render(" → "+session) + "\n")
+			s.WriteString(selectedStyle.Render(" → "+line) + "\n")
 		} else {
-			s.WriteString(itemStyle.Render("   "+session) + "\n")
+			s.WriteString(itemStyle.Render("   "+line) + "\n")
 		}
 	}
 
-	s.WriteString("\n" + helpStyle.Render("↑↓/jk • Enter = kill • q = back"))
+	s.WriteString("\n" + helpStyle.Render("↑↓/jk • Space = toggle • Enter = kill selected • q = back"))
 	return s.String()
 }
 
-// ====================== CLI (mantido) ======================
+// ====================== CLI Commands ======================
 type CLI struct {
 	New     NewCmd     `cmd:"" help:"Create a new session"`
 	Switch  SwitchCmd  `cmd:"" aliases:"s" help:"Switch to a session"`
-	Kill    KillCmd    `cmd:"" aliases:"k" help:"Kill a session"`
+	Kill    KillCmd    `cmd:"" aliases:"k" help:"Kill a session (empty = interactive)"`
 	Rename  RenameCmd  `cmd:"" aliases:"r" help:"Rename a session"`
-	List    ListCmd    `cmd:"" help:"List sessions"`
+	List    ListCmd    `cmd:"" help:"List active sessions"`
 	Version VersionCmd `cmd:"" help:"Show version"`
 }
 
@@ -336,7 +358,7 @@ type RenameCmd struct {
 	New string `arg:"" name:"new"`
 }
 
-// ====================== Command Implementations ======================
+// ====================== CLI Implementations ======================
 func (c ListCmd) Run() error {
 	sessions := listSessions()
 	if len(sessions) == 0 {
@@ -345,7 +367,7 @@ func (c ListCmd) Run() error {
 	}
 	fmt.Println("Active tmux sessions:")
 	for _, s := range sessions {
-		fmt.Printf(" • %s\n", s)
+		fmt.Printf(" • %s (%s)\n", s, getSessionInfo(s))
 	}
 	return nil
 }
@@ -374,7 +396,7 @@ func (c NewCmd) Run() error {
 
 func (c SwitchCmd) Run() error {
 	if c.Name == "" {
-		fmt.Println("Use 'tms switch <name>' or use the interactive menu.")
+		fmt.Println("Usage: tms switch <name>  or use interactive menu")
 		return nil
 	}
 	_, err := runTmux("switch-client", "-t", c.Name)
@@ -431,7 +453,7 @@ func main() {
 		return
 	}
 
-	// Menu interativo
+	// Interactive Menu
 	p := tea.NewProgram(initialMenuModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v\n", err)
