@@ -18,3 +18,13 @@ tms k              # atalho para kill (interactive)
 tms k main
 tms r oldname newname
 ```
+
+```
+# Build com informações do Git e data
+go build -ldflags="-s -w \
+  -X main.Version=1.2.0 \
+  -X main.GitCommit=$(git rev-parse --short HEAD) \
+  -X main.BuildTime=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+  -o tms
+```
+
