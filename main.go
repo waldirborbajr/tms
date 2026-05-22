@@ -37,24 +37,113 @@ func tmuxDisplay(message string) {
 	runTmux("display-message", message)
 }
 
-// ====================== Lip Gloss Styles ======================
+// ====================== Styles ======================
 var (
-	titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5555")).Bold(true)
+	titleStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5555")).Bold(true)
 	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5555")).Bold(true)
-	itemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#BBBBBB"))
+	itemStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#BBBBBB"))
+	helpStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 )
 
-// ====================== Bubble Tea Model ======================
+// ====================== Main Menu ======================
+type menuModel struct {
+	cursor int
+}
+
+var menuOptions = []string{
+	"New Session",
+	"Switch Session",
+	"Kill Session",
+	"Rename Session",
+	"List Sessions",
+	"Show Version",
+	"Quit",
+}
+
+func initialMenuModel() menuModel {
+	return menuModel{cursor: 0}
+}
+
+func (m menuModel) Init() tea.Cmd { return nil }
+
+func (m menuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "esc", "ctrl+c":
+			return m, tea.Quit
+
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(menuOptions)-1 {
+				m.cursor++
+			}
+
+		case "enter":
+			switch menuOptions[m.cursor] {
+			case "New Session":
+				// Por enquanto sai e usa tmux prompt (melhoraremos depois)
+				runTmux("command-prompt", "-p", "New session name:", "new-session -s '%%'")
+				return m, tea.Quit
+			case "Switch Session":
+				runTmux("choose-session")
+				return m, tea.Quit
+			case "Kill Session":
+				return initialKillModel(), nil
+			case "Rename Session":
+				runTmux("command-prompt", "-I", "#S", "-p", "New name:", "rename-session '%%'")
+				return m, tea.Quit
+			case "List Sessions":
+				sessions := listSessions()
+				if len(sessions) == 0 {
+					fmt.Println("No active tmux sessions.")
+				} else {
+					fmt.Println("Active sessions:")
+					for _, s := range sessions {
+						fmt.Printf(" • %s\n", s)
+					}
+				}
+				return m, tea.Quit
+			case "Show Version":
+				fmt.Printf("tms version %s\n", Version)
+				fmt.Printf("Git Commit : %s\n", GitCommit)
+				fmt.Printf("Built      : %s\n", BuildTime)
+				return m, tea.Quit
+			case "Quit":
+				return m, tea.Quit
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m menuModel) View() string {
+	var s strings.Builder
+	s.WriteString(titleStyle.Render("🚀 TMS - Tmux Session Manager") + "\n\n")
+
+	for i, option := range menuOptions {
+		if i == m.cursor {
+			s.WriteString(selectedStyle.Render(" → "+option) + "\n")
+		} else {
+			s.WriteString(itemStyle.Render("   "+option) + "\n")
+		}
+	}
+
+	s.WriteString("\n" + helpStyle.Render("↑↓/jk • Enter = select • q = quit"))
+	return s.String()
+}
+
+// ====================== Kill Interactive ======================
 type killModel struct {
 	sessions []string
 	cursor   int
 }
 
 func initialKillModel() killModel {
-	return killModel{
-		sessions: listSessions(),
-		cursor:   0,
-	}
+	return killModel{sessions: listSessions(), cursor: 0}
 }
 
 func (m killModel) Init() tea.Cmd { return nil }
@@ -64,7 +153,7 @@ func (m killModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "esc", "ctrl+c":
-			return m, tea.Quit
+			return initialMenuModel(), nil
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
@@ -77,13 +166,11 @@ func (m killModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.sessions) > 0 {
 				selected := m.sessions[m.cursor]
 				_, err := runTmux("kill-session", "-t", selected)
-				if err != nil {
-					tmuxDisplay("Failed to kill session")
-				} else {
-					tmuxDisplay(fmt.Sprintf("Killed session: %s", selected))
+				if err == nil {
+					tmuxDisplay("Killed session: " + selected)
 				}
 			}
-			return m, tea.Quit
+			return initialMenuModel(), nil
 		}
 	}
 	return m, nil
@@ -91,7 +178,7 @@ func (m killModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m killModel) View() string {
 	if len(m.sessions) == 0 {
-		return "No tmux sessions found.\n"
+		return "No sessions found.\n"
 	}
 
 	var s strings.Builder
@@ -101,50 +188,36 @@ func (m killModel) View() string {
 		if i == m.cursor {
 			s.WriteString(selectedStyle.Render(" → "+session) + "\n")
 		} else {
-			s.WriteString(itemStyle.Render("  "+session) + "\n")
+			s.WriteString(itemStyle.Render("   "+session) + "\n")
 		}
 	}
 
-	s.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render("↑↓/jk • Enter = kill • q = cancel"))
+	s.WriteString("\n" + helpStyle.Render("↑↓/jk • Enter = kill • q = back to menu"))
 	return s.String()
 }
 
-// ====================== CLI Structure ======================
+// ====================== CLI Commands (mantidos) ======================
 type CLI struct {
-	List    ListCmd    `cmd:"" help:"List active tmux sessions"`
-	New     NewCmd     `cmd:"" help:"Create a new tmux session"`
-	Switch  SwitchCmd  `cmd:"" aliases:"s" help:"Switch to a tmux session"`
-	Attach  AttachCmd  `cmd:"" help:"Attach to a tmux session"`
-	Kill    KillCmd    `cmd:"" aliases:"k" help:"Kill a tmux session (interactive if no name)"`
-	Rename  RenameCmd  `cmd:"" aliases:"r" help:"Rename a tmux session"`
-	Version VersionCmd `cmd:"" help:"Show version and build information"`
+	New     NewCmd     `cmd:"" help:"Create a new session"`
+	Switch  SwitchCmd  `cmd:"" aliases:"s" help:"Switch to a session"`
+	Kill    KillCmd    `cmd:"" aliases:"k" help:"Kill a session"`
+	Rename  RenameCmd  `cmd:"" aliases:"r" help:"Rename a session"`
+	List    ListCmd    `cmd:"" help:"List active sessions"`
+	Version VersionCmd `cmd:"" help:"Show version"`
 }
 
 type ListCmd struct{}
 type VersionCmd struct{}
-
-type NewCmd struct {
-	Name string `arg:"" optional:"" help:"Name of the new session"`
-}
-
-type SwitchCmd struct {
-	Name string `arg:"" optional:"" help:"Session name to switch to"`
-}
-
-type AttachCmd struct {
-	Name string `arg:"" required:"" help:"Session name to attach"`
-}
-
-type KillCmd struct {
-	Name string `arg:"" optional:"" help:"Session name to kill (empty = interactive)"`
-}
+type NewCmd struct{ Name string `arg:"" optional:"" help:"Session name"` }
+type SwitchCmd struct{ Name string `arg:"" optional:"" help:"Session name"` }
+type KillCmd struct{ Name string `arg:"" optional:"" help:"Session name (empty = interactive)" }
 
 type RenameCmd struct {
-	Old string `arg:"" name:"old" help:"Current session name"`
-	New string `arg:"" name:"new" help:"New session name"`
+	Old string `arg:"" name:"old"`
+	New string `arg:"" name:"new"`
 }
 
-// ====================== Command Handlers ======================
+// Command implementations
 func (c ListCmd) Run() error {
 	sessions := listSessions()
 	if len(sessions) == 0 {
@@ -233,17 +306,26 @@ func (c RenameCmd) Run() error {
 
 // ====================== Main ======================
 func main() {
-	var cli CLI
-	ctx := kong.Parse(&cli,
-		kong.Name("tms"),
-		kong.Description("Simple and lightweight Tmux session manager"),
-		kong.UsageOnError(),
-		kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
-	)
+	// Se algum argumento for passado → modo CLI (mantém compatibilidade)
+	if len(os.Args) > 1 {
+		var cli CLI
+		ctx := kong.Parse(&cli,
+			kong.Name("tms"),
+			kong.Description("Simple Tmux Session Manager"),
+			kong.UsageOnError(),
+			kong.ConfigureHelp(kong.HelpOptions{Compact: true}),
+		)
 
-	err := ctx.Run()
-	if err != nil {
+		if err := ctx.Run(); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Sem argumentos → abre o menu interativo
+	p := tea.NewProgram(initialMenuModel())
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
 	}
 }
