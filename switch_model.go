@@ -21,11 +21,11 @@ func NewSwitchModel() SwitchModel {
 	}
 }
 
-func (m SwitchModel) Init() tea.Cmd {
+func (s SwitchModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m SwitchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (s SwitchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -33,45 +33,45 @@ func (m SwitchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return NewMenuModel(), nil
 
 		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
+			if s.cursor > 0 {
+				s.cursor--
 			}
 
 		case "down", "j":
-			if m.cursor < len(m.sessions)-1 {
-				m.cursor++
+			if s.cursor < len(s.sessions)-1 {
+				s.cursor++
 			}
 
 		case "enter":
-			if len(m.sessions) > 0 {
-				selected := m.sessions[m.cursor]
+			if len(s.sessions) > 0 {
+				selected := s.sessions[s.cursor]
 				SwitchSession(selected)
 				TmuxDisplay("Switched to: " + selected)
 			}
 			return NewMenuModel(), nil
 		}
 	}
-	return m, nil
+	return s, nil
 }
 
-func (m SwitchModel) View() string {
-	if len(m.sessions) == 0 {
+func (s SwitchModel) View() string {
+	if len(s.sessions) == 0 {
 		return "No sessions found.\n"
 	}
 
-	var s strings.Builder
-	s.WriteString(TitleStyle.Render("🔄 Switch Session") + "\n\n")
+	var sb strings.Builder
+	sb.WriteString(TitleStyle.Render("🔄 Switch Session") + "\n\n")
 
-	for i, session := range m.sessions {
+	for i, session := range s.sessions {
 		info := GetSessionInfo(session)
 		line := fmt.Sprintf("%s (%s)", session, info)
-		if i == m.cursor {
-			s.WriteString(SelectedStyle.Render(" → "+line) + "\n")
+		if i == s.cursor {
+			sb.WriteString(SelectedStyle.Render(" → "+line) + "\n")
 		} else {
-			s.WriteString(ItemStyle.Render("   "+line) + "\n")
+			sb.WriteString(ItemStyle.Render("   "+line) + "\n")
 		}
 	}
 
-	s.WriteString("\n" + HelpStyle.Render("↑↓/jk • Enter = switch • q = back"))
-	return s.String()
+	sb.WriteString("\n" + HelpStyle.Render("↑↓/jk • Enter = switch • q = back"))
+	return sb.String()
 }

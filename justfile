@@ -104,7 +104,7 @@ version-bump type="patch":
 # ─── Build ─────────────────────────────────────────────────────
 
 # Main optimized build: small, secure, fast
-build:
+build: test
     @echo "🔨 Building {{BIN_NAME}} {{version}} (optimized)..."
     @mkdir -p bin
     CGO_ENABLED=0 go build \

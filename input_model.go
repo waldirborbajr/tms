@@ -24,11 +24,11 @@ func NewTextInput(prompt, action, oldName string) TextInputModel {
 	}
 }
 
-func (m TextInputModel) Init() tea.Cmd {
+func (t TextInputModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m TextInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (t TextInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -36,54 +36,54 @@ func (m TextInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return NewMenuModel(), nil
 
 		case "enter":
-			if m.value == "" {
-				return m, nil
+			if t.value == "" {
+				return t, nil
 			}
 
 			cfg := GetConfig()
-			switch m.action {
+			switch t.action {
 			case "new":
-				if err := CreateSession(m.value); err != nil {
+				if err := CreateSession(t.value); err != nil {
 					TmuxDisplay("Failed to create session: " + err.Error())
 					return NewMenuModel(), nil
 				}
 				if cfg.AutoSwitch {
-					if err := SwitchSession(m.value); err != nil {
+					if err := SwitchSession(t.value); err != nil {
 						TmuxDisplay("Created session but failed to switch: " + err.Error())
 						return NewMenuModel(), nil
 					}
 				}
-				TmuxDisplay("Created session: " + m.value)
+				TmuxDisplay("Created session: " + t.value)
 
 			case "rename":
-				if m.oldName != "" {
-					if err := RenameSession(m.oldName, m.value); err != nil {
+				if t.oldName != "" {
+					if err := RenameSession(t.oldName, t.value); err != nil {
 						TmuxDisplay("Failed to rename session: " + err.Error())
 						return NewMenuModel(), nil
 					}
-					TmuxDisplay("Renamed: " + m.oldName + " → " + m.value)
+					TmuxDisplay("Renamed: " + t.oldName + " → " + t.value)
 				}
 			}
 			return NewMenuModel(), nil
 
 		case "backspace":
-			if len(m.value) > 0 {
-				m.value = m.value[:len(m.value)-1]
+			if len(t.value) > 0 {
+				t.value = t.value[:len(t.value)-1]
 			}
 
 		default:
 			if len(msg.String()) == 1 {
-				m.value += msg.String()
+				t.value += msg.String()
 			}
 		}
 	}
-	return m, nil
+	return t, nil
 }
 
-func (m TextInputModel) View() string {
+func (t TextInputModel) View() string {
 	var s strings.Builder
-	s.WriteString(TitleStyle.Render("✏️ "+m.prompt) + "\n\n")
-	s.WriteString(InputStyle.Render(" > "+m.value+"█") + "\n\n")
+	s.WriteString(TitleStyle.Render("✏️ "+t.prompt) + "\n\n")
+	s.WriteString(InputStyle.Render(" > "+t.value+"█") + "\n\n")
 	s.WriteString(HelpStyle.Render("Type name • Enter = confirm • Esc = cancel"))
 	return s.String()
 }

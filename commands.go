@@ -46,6 +46,11 @@ func (c NewCmd) Run() error {
 		name = cfg.DefaultSession
 	}
 
+	if name == "" {
+		TmuxDisplay("No session name provided and default is empty")
+		return fmt.Errorf("session name required")
+	}
+
 	if err := CreateSession(name); err != nil {
 		TmuxDisplay("Failed to create session")
 		return err
@@ -70,7 +75,11 @@ type SwitchCmd struct {
 
 func (c SwitchCmd) Run() error {
 	if c.Name == "" {
-		fmt.Println("Usage: tms switch <name>")
+		// Interactive switch mode
+		p := tea.NewProgram(NewSwitchModel())
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error: %v\n", err)
+		}
 		return nil
 	}
 

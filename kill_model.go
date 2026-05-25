@@ -23,11 +23,11 @@ func NewKillModel() KillModel {
 	}
 }
 
-func (m KillModel) Init() tea.Cmd {
+func (k KillModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m KillModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (k KillModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -35,25 +35,25 @@ func (m KillModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return NewMenuModel(), nil
 
 		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
+			if k.cursor > 0 {
+				k.cursor--
 			}
 
 		case "down", "j":
-			if m.cursor < len(m.sessions)-1 {
-				m.cursor++
+			if k.cursor < len(k.sessions)-1 {
+				k.cursor++
 			}
 
 		case " ":
-			if len(m.sessions) > 0 {
-				sess := m.sessions[m.cursor]
-				m.selected[sess] = !m.selected[sess]
+			if len(k.sessions) > 0 {
+				sess := k.sessions[k.cursor]
+				k.selected[sess] = !k.selected[sess]
 			}
 
 		case "enter":
 			killed := 0
 			var failed []string
-			for sess, sel := range m.selected {
+			for sess, sel := range k.selected {
 				if sel {
 					if err := KillSession(sess); err != nil {
 						failed = append(failed, sess)
@@ -70,26 +70,26 @@ func (m KillModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return NewMenuModel(), nil
 		}
 	}
-	return m, nil
+	return k, nil
 }
 
-func (m KillModel) View() string {
-	if len(m.sessions) == 0 {
+func (k KillModel) View() string {
+	if len(k.sessions) == 0 {
 		return "No sessions found.\n"
 	}
 
 	var s strings.Builder
 	s.WriteString(TitleStyle.Render("🗑️ Kill Sessions (Multiple)") + "\n\n")
 
-	for i, session := range m.sessions {
+	for i, session := range k.sessions {
 		info := GetSessionInfo(session)
 		check := " "
-		if m.selected[session] {
+		if k.selected[session] {
 			check = "✓"
 		}
 		line := fmt.Sprintf("[%s] %s (%s)", check, session, info)
 
-		if i == m.cursor {
+		if i == k.cursor {
 			s.WriteString(SelectedStyle.Render(" → "+line) + "\n")
 		} else {
 			s.WriteString(ItemStyle.Render("   "+line) + "\n")

@@ -53,7 +53,6 @@ theme = "default"
 			config = defaultConfig()
 			return
 		}
-		fmt.Println("Created default config at:", configPath)
 	}
 
 	// Load config

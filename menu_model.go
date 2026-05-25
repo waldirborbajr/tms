@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -73,19 +72,13 @@ func (m MenuModel) handleSelection() (tea.Model, tea.Cmd) {
 		return NewTextInput("New name for: "+current, "rename", current), nil
 
 	case "List Sessions":
-		fmt.Print(renderSessionList())
-		fmt.Scanln()
-		return m, nil
+		return NewInformationModel(renderSessionList()), nil
 
 	case "Show Version":
-		fmt.Print(renderVersion())
-		fmt.Scanln()
-		return m, nil
+		return NewInformationModel(renderVersion()), nil
 
 	case "Show Config":
-		fmt.Print(renderConfig())
-		fmt.Scanln()
-		return m, nil
+		return NewInformationModel(renderConfig()), nil
 
 	case "Quit":
 		return m, tea.Quit
