@@ -71,6 +71,8 @@ help:
     @echo "│  just clean                 → Clean binaries      │"
     @echo "│  just clean-all             → Clean all artifacts │"
     @echo "│  just pre-commit            → Pre-commit checks   │"
+    @echo "│  just clean-go              → Clean Go cache + toolchain   │"
+    @echo "│  just clean-go-nuclear      → Nuclear fix (when Go breaks) │" 
     @echo "│                                                    │"
     @echo "│ 🚢 RELEASE                                        │"
     @echo "│  just release-dry-run       → Preview release     │"
@@ -377,3 +379,36 @@ info:
     else \
         echo "  Binary size: (not built)"; \
     fi
+
+# ─── Nuclear Go Maintenance (Fixes toolchain & cache issues) ─────
+clean-go-nuclear:
+    @echo "☢️  Running Nuclear Go Cleanup (Toolchain + Cache)..."
+    @echo "This will fix 'version does not match' and broken toolchain errors."
+    
+    @echo "→ Removing broken toolchain..."
+    rm -rf /go/pkg/mod/golang.org/toolchain* 2>/dev/null || true
+    
+    @echo "→ Forcing local toolchain..."
+    GOTOOLCHAIN=local go env -w GOTOOLCHAIN=local 2>/dev/null || true
+    
+    @echo "→ Cleaning all Go caches..."
+    GOTOOLCHAIN=local go clean -cache -modcache -testcache -fuzzcache 2>/dev/null || true
+    
+    @echo "→ Removing module cache entirely..."
+    rm -rf $(go env GOMODCACHE) 2>/dev/null || true
+    rm -rf $(go env GOCACHE) 2>/dev/null || true
+    
+    @echo "→ Verifying Go installation..."
+    GOTOOLCHAIN=local go version
+    
+    @echo ""
+    @echo "✅ Nuclear cleanup completed!"
+    @echo "   Try building again with: just build"
+
+# Alternative shorter version (recommended first try)
+clean-go:
+    @echo "🧹 Cleaning Go caches and toolchain..."
+    rm -rf /go/pkg/mod/golang.org/toolchain* 2>/dev/null || true
+    GOTOOLCHAIN=local go clean -cache -modcache
+    GOTOOLCHAIN=local go env -w GOTOOLCHAIN=local
+    @echo "✅ Go cache cleaned. Try: just build"
