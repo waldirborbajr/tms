@@ -1,0 +1,101 @@
+package main
+
+import (
+	"fmt"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+// KillModel handles multi-select session deletion
+type KillModel struct {
+	sessions []string
+	selected map[string]bool
+	cursor   int
+}
+
+// NewKillModel creates a new kill model
+func NewKillModel() KillModel {
+	return KillModel{
+		sessions: ListSessions(),
+		selected: make(map[string]bool),
+		cursor:   0,
+	}
+}
+
+func (k KillModel) Init() tea.Cmd {
+	return nil
+}
+
+func (k KillModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "esc", "ctrl+c":
+			return NewMenuModel(), nil
+
+		case "up", "k":
+			if k.cursor > 0 {
+				k.cursor--
+			}
+
+		case "down", "j":
+			if k.cursor < len(k.sessions)-1 {
+				k.cursor++
+			}
+
+		case " ":
+			if len(k.sessions) > 0 {
+				sess := k.sessions[k.cursor]
+				k.selected[sess] = !k.selected[sess]
+			}
+
+		case "enter":
+			killed := 0
+			var failed []string
+			for sess, sel := range k.selected {
+				if sel {
+					if err := KillSession(sess); err != nil {
+						failed = append(failed, sess)
+					} else {
+						killed++
+					}
+				}
+			}
+			if len(failed) > 0 {
+				TmuxDisplay(fmt.Sprintf("Failed to kill: %s", strings.Join(failed, ", ")))
+			} else if killed > 0 {
+				TmuxDisplay(fmt.Sprintf("Killed %d session(s)", killed))
+			}
+			return NewMenuModel(), nil
+		}
+	}
+	return k, nil
+}
+
+func (k KillModel) View() string {
+	if len(k.sessions) == 0 {
+		return "No sessions found.\n"
+	}
+
+	var s strings.Builder
+	s.WriteString(TitleStyle.Render("🗑️ Kill Sessions (Multiple)") + "\n\n")
+
+	for i, session := range k.sessions {
+		info := GetSessionInfo(session)
+		check := " "
+		if k.selected[session] {
+			check = "✓"
+		}
+		line := fmt.Sprintf("[%s] %s (%s)", check, session, info)
+
+		if i == k.cursor {
+			s.WriteString(SelectedStyle.Render(" → "+line) + "\n")
+		} else {
+			s.WriteString(ItemStyle.Render("   "+line) + "\n")
+		}
+	}
+
+	s.WriteString("\n" + HelpStyle.Render("↑↓/jk • Space = toggle • Enter = kill selected • q = back"))
+	return s.String()
+}
