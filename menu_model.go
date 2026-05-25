@@ -73,42 +73,17 @@ func (m MenuModel) handleSelection() (tea.Model, tea.Cmd) {
 		return NewTextInput("New name for: "+current, "rename", current), nil
 
 	case "List Sessions":
-		sessions := ListSessions()
-		if len(sessions) == 0 {
-			fmt.Println("No active tmux sessions.")
-		} else {
-			fmt.Println("Active sessions:")
-			for _, s := range sessions {
-				fmt.Printf(" • %s (%s)\n", s, GetSessionInfo(s))
-			}
-		}
+		fmt.Print(renderSessionList())
 		fmt.Scanln()
 		return m, nil
 
 	case "Show Version":
-		fmt.Println()
-		fmt.Println("┌─────────────────────────────────────┐")
-		fmt.Printf("│ tms v%s\n", Version)
-		fmt.Println("├─────────────────────────────────────┤")
-		fmt.Printf("│ Git Commit  : %-20s │\n", GitCommit)
-		fmt.Printf("│ Built       : %-20s │\n", BuildTime)
-		fmt.Println("└─────────────────────────────────────┘")
-		fmt.Println()
+		fmt.Print(renderVersion())
 		fmt.Scanln()
 		return m, nil
 
 	case "Show Config":
-		cfg := GetConfig()
-		fmt.Println()
-		fmt.Println("┌──────────────────────────────────────┐")
-		fmt.Println("│ TMS Configuration")
-		fmt.Println("├──────────────────────────────────────┤")
-		fmt.Printf("│ Default Session  : %-18s │\n", cfg.DefaultSession)
-		fmt.Printf("│ Default Directory: %-18s │\n", cfg.DefaultDirectory)
-		fmt.Printf("│ Auto Switch      : %-18v │\n", cfg.AutoSwitch)
-		fmt.Printf("│ Theme            : %-18s │\n", cfg.Theme)
-		fmt.Println("└──────────────────────────────────────┘")
-		fmt.Println()
+		fmt.Print(renderConfig())
 		fmt.Scanln()
 		return m, nil
 

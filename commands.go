@@ -11,15 +11,7 @@ import (
 type ListCmd struct{}
 
 func (c ListCmd) Run() error {
-	sessions := ListSessions()
-	if len(sessions) == 0 {
-		fmt.Println("No tmux sessions found.")
-		return nil
-	}
-	fmt.Println("Active tmux sessions:")
-	for _, s := range sessions {
-		fmt.Printf(" • %s (%s)\n", s, GetSessionInfo(s))
-	}
+	fmt.Print(renderSessionList())
 	return nil
 }
 
@@ -28,15 +20,7 @@ func (c ListCmd) Run() error {
 type VersionCmd struct{}
 
 func (c VersionCmd) Run() error {
-	// Format version info with consistent alignment
-	fmt.Println()
-	fmt.Println("┌─────────────────────────────────────┐")
-	fmt.Printf("│ tms v%s\n", Version)
-	fmt.Println("├─────────────────────────────────────┤")
-	fmt.Printf("│ Git Commit  : %-20s │\n", GitCommit)
-	fmt.Printf("│ Built       : %-20s │\n", BuildTime)
-	fmt.Println("└─────────────────────────────────────┘")
-	fmt.Println()
+	fmt.Print(renderVersion())
 	return nil
 }
 
@@ -45,17 +29,7 @@ func (c VersionCmd) Run() error {
 type ConfigCmd struct{}
 
 func (c ConfigCmd) Run() error {
-	cfg := GetConfig()
-	fmt.Println()
-	fmt.Println("┌──────────────────────────────────────┐")
-	fmt.Println("│ TMS Configuration")
-	fmt.Println("├──────────────────────────────────────┤")
-	fmt.Printf("│ Default Session  : %-18s │\n", cfg.DefaultSession)
-	fmt.Printf("│ Default Directory: %-18s │\n", cfg.DefaultDirectory)
-	fmt.Printf("│ Auto Switch      : %-18v │\n", cfg.AutoSwitch)
-	fmt.Printf("│ Theme            : %-18s │\n", cfg.Theme)
-	fmt.Println("└──────────────────────────────────────┘")
-	fmt.Println()
+	fmt.Print(renderConfig())
 	return nil
 }
 
