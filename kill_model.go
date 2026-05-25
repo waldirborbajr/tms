@@ -52,13 +52,19 @@ func (m KillModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			killed := 0
+			var failed []string
 			for sess, sel := range m.selected {
 				if sel {
-					KillSession(sess)
-					killed++
+					if err := KillSession(sess); err != nil {
+						failed = append(failed, sess)
+					} else {
+						killed++
+					}
 				}
 			}
-			if killed > 0 {
+			if len(failed) > 0 {
+				TmuxDisplay(fmt.Sprintf("Failed to kill: %s", strings.Join(failed, ", ")))
+			} else if killed > 0 {
 				TmuxDisplay(fmt.Sprintf("Killed %d session(s)", killed))
 			}
 			return NewMenuModel(), nil

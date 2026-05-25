@@ -36,7 +36,11 @@ func LoadConfig() {
 
 	// Create default config if it doesn't exist
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		os.MkdirAll(fullConfigDir, 0755)
+		if err := os.MkdirAll(fullConfigDir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "tms: failed to create config directory: %v\n", err)
+			config = defaultConfig()
+			return
+		}
 		defaultContent := `# TMS - Tmux Session Manager Configuration
 
 default_session = "main"
@@ -44,12 +48,17 @@ default_directory = ""          # Example: "/home/user/projects"
 auto_switch = true
 theme = "default"
 `
-		os.WriteFile(configPath, []byte(defaultContent), 0644)
+		if err := os.WriteFile(configPath, []byte(defaultContent), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "tms: failed to write default config: %v\n", err)
+			config = defaultConfig()
+			return
+		}
 		fmt.Println("Created default config at:", configPath)
 	}
 
 	// Load config
 	if _, err := toml.DecodeFile(configPath, &config); err != nil {
+		fmt.Fprintf(os.Stderr, "tms: failed to load config, using defaults: %v\n", err)
 		config = defaultConfig()
 	}
 }

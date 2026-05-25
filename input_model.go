@@ -43,15 +43,24 @@ func (m TextInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cfg := GetConfig()
 			switch m.action {
 			case "new":
-				CreateSession(m.value)
+				if err := CreateSession(m.value); err != nil {
+					TmuxDisplay("Failed to create session: " + err.Error())
+					return NewMenuModel(), nil
+				}
 				if cfg.AutoSwitch {
-					SwitchSession(m.value)
+					if err := SwitchSession(m.value); err != nil {
+						TmuxDisplay("Created session but failed to switch: " + err.Error())
+						return NewMenuModel(), nil
+					}
 				}
 				TmuxDisplay("Created session: " + m.value)
 
 			case "rename":
 				if m.oldName != "" {
-					RenameSession(m.oldName, m.value)
+					if err := RenameSession(m.oldName, m.value); err != nil {
+						TmuxDisplay("Failed to rename session: " + err.Error())
+						return NewMenuModel(), nil
+					}
 					TmuxDisplay("Renamed: " + m.oldName + " → " + m.value)
 				}
 			}

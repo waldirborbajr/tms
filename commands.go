@@ -78,7 +78,10 @@ func (c NewCmd) Run() error {
 	}
 
 	if cfg.AutoSwitch {
-		SwitchSession(name)
+		if err := SwitchSession(name); err != nil {
+			TmuxDisplay(fmt.Sprintf("Created session '%s' but failed to switch: %v", name, err))
+			return err
+		}
 	}
 
 	TmuxDisplay("Created session: " + name)
