@@ -1,6 +1,10 @@
 # tms — Tmux Session Manager
 
 <p align="center">
+  <img width="256" height="256" src="./assets/tms-logo.png" />
+</p>
+
+<p align="center">
   <strong>A clean, fast, and modern tmux session manager written in Go.</strong>
 </p>
 
