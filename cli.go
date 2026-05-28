@@ -9,6 +9,9 @@ type CLI struct {
 	Switch  SwitchCmd  `cmd:"" aliases:"s" help:"Switch to a session"`
 	Kill    KillCmd    `cmd:"" aliases:"k" help:"Kill a session"`
 	Rename  RenameCmd  `cmd:"" aliases:"r" help:"Rename a session"`
+	Save    SaveCmd    `cmd:"" help:"Save a session definition for restore"`
+	Restore RestoreCmd `cmd:"" help:"Restore a saved session"`
+	Saved   SavedCmd   `cmd:"" help:"List saved session definitions"`
 	List    ListCmd    `cmd:"" help:"List active sessions"`
 	Version VersionCmd `cmd:"" help:"Show version"`
 	Config  ConfigCmd  `cmd:"" help:"Show current configuration"`

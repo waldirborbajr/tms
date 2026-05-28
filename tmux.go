@@ -39,10 +39,14 @@ func TmuxDisplay(message string) {
 
 // CreateSession creates a new tmux session
 func CreateSession(name string) error {
-	cfg := GetConfig()
+	return CreateSessionWithDir(name, GetConfig().DefaultDirectory)
+}
+
+// CreateSessionWithDir creates a new tmux session in a specific directory
+func CreateSessionWithDir(name, directory string) error {
 	cmd := []string{"new-session", "-d", "-s", name}
-	if cfg.DefaultDirectory != "" {
-		cmd = append(cmd, "-c", cfg.DefaultDirectory)
+	if directory != "" {
+		cmd = append(cmd, "-c", directory)
 	}
 	_, err := RunTmux(cmd...)
 	return err

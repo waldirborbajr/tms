@@ -15,6 +15,7 @@
 - ✨ **Interactive TUI** — Launch with no arguments for an intuitive menu (powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea))
 - 🎯 **CLI commands** — Full support for scripting and keybindings via [Kong](https://github.com/alecthomas/kong)
 - 📋 **Session management** — Create, switch, kill, rename, and list sessions
+- 🗂️ **Session persistence** — Save and restore named session definitions
 - ⚙️ **Configuration** — Persistent settings via `~/.config/tms/config.toml`
 - 🚀 **Auto-switch** — Optionally switch to new sessions immediately
 - 🎨 **Theming** — Customizable color schemes
@@ -72,6 +73,15 @@ tms k [name]           # alias
 # Rename a session
 tms rename <old> <new>
 tms r <old> <new>      # alias
+
+# Save a session definition for restore
+tms save <name> [directory]
+
+# Restore a saved session definition
+tms restore <name>
+
+# List saved session definitions
+tms saved
 
 # List all active sessions
 tms list
