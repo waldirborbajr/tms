@@ -130,3 +130,63 @@ func (c RenameCmd) Run() error {
 	}
 	return nil
 }
+
+// -----
+
+type SaveCmd struct {
+	Name string `arg:"" help:"Saved session name"`
+	Dir  string `arg:"" optional:"" help:"Optional directory to restore into"`
+}
+
+func (c SaveCmd) Run() error {
+	cfg := GetConfig()
+	dir := c.Dir
+	if dir == "" {
+		dir = cfg.DefaultDirectory
+	}
+
+	if err := SaveSession(c.Name, dir); err != nil {
+		TmuxDisplay("Failed to save session")
+		return err
+	}
+
+	TmuxDisplay(fmt.Sprintf("Saved session definition: %s", c.Name))
+	return nil
+}
+
+// -----
+
+type RestoreCmd struct {
+	Name string `arg:"" help:"Saved session name"`
+}
+
+func (c RestoreCmd) Run() error {
+	if err := RestoreSession(c.Name); err != nil {
+		TmuxDisplay("Failed to restore session")
+		return err
+	}
+
+	TmuxDisplay(fmt.Sprintf("Restored session: %s", c.Name))
+	return nil
+}
+
+// -----
+
+type SavedCmd struct{}
+
+func (c SavedCmd) Run() error {
+	saved, err := ListSavedSessions()
+	if err != nil {
+		return err
+	}
+
+	if len(saved) == 0 {
+		fmt.Print("No saved sessions found.\n")
+		return nil
+	}
+
+	for _, name := range saved {
+		fmt.Println(name)
+	}
+	return nil
+}

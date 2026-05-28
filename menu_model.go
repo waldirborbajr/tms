@@ -16,7 +16,10 @@ var menuOptions = []string{
 	"Switch Session",
 	"Kill Sessions",
 	"Rename Current Session",
-	"List Sessions",
+	"List Active Sessions",
+	"Save Current Session",
+	"Restore Saved Session",
+	"List Saved Sessions",
 	"Show Version",
 	"Show Config",
 	"Quit",
@@ -71,8 +74,17 @@ func (m MenuModel) handleSelection() (tea.Model, tea.Cmd) {
 		current, _ := GetCurrentSession()
 		return NewTextInput("New name for: "+current, "rename", current), nil
 
-	case "List Sessions":
+	case "List Active Sessions":
 		return NewInformationModel(renderSessionList()), nil
+
+	case "Save Current Session":
+		return NewTextInput("Save session name", "save", ""), nil
+
+	case "Restore Saved Session":
+		return NewTextInput("Restore saved session name", "restore", ""), nil
+
+	case "List Saved Sessions":
+		return NewInformationModel(renderSavedSessionList()), nil
 
 	case "Show Version":
 		return NewInformationModel(renderVersion()), nil

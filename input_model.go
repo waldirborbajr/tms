@@ -63,9 +63,22 @@ func (t TextInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					TmuxDisplay("Renamed: " + t.oldName + " → " + t.value)
 				}
+
+			case "save":
+				if err := SaveSession(t.value, cfg.DefaultDirectory); err != nil {
+					TmuxDisplay("Failed to save session: " + err.Error())
+					return NewMenuModel(), nil
+				}
+				TmuxDisplay("Saved session definition: " + t.value)
+
+			case "restore":
+				if err := RestoreSession(t.value); err != nil {
+					TmuxDisplay("Failed to restore session: " + err.Error())
+					return NewMenuModel(), nil
+				}
+				TmuxDisplay("Restored session: " + t.value)
 			}
 			return NewMenuModel(), nil
-
 		case "backspace":
 			if len(t.value) > 0 {
 				t.value = t.value[:len(t.value)-1]

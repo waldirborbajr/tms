@@ -49,3 +49,19 @@ func renderSessionList() string {
 	}
 	return s.String()
 }
+
+func renderSavedSessionList() string {
+	saved, err := ListSavedSessions()
+	if err != nil {
+		return fmt.Sprintf("Failed to load saved sessions: %v\n", err)
+	}
+	if len(saved) == 0 {
+		return "No saved sessions found.\n"
+	}
+	var s strings.Builder
+	s.WriteString("Saved sessions:\n")
+	for _, name := range saved {
+		s.WriteString(fmt.Sprintf(" • %s\n", name))
+	}
+	return s.String()
+}
