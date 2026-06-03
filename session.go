@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 )
 
 // SessionMetadata stores persistent session definition details.
@@ -30,7 +31,28 @@ func sessionStorageDir() (string, error) {
 
 func sessionFileName(name string) string {
 	safeName := strings.ReplaceAll(name, string(filepath.Separator), "_")
+	safeName = strings.ReplaceAll(safeName, "/", "_")
+	safeName = strings.ReplaceAll(safeName, "\\", "_")
 	return fmt.Sprintf("%s.json", safeName)
+}
+
+func ValidateSessionName(name string) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return errors.New("session name is required")
+	}
+	if strings.ContainsAny(trimmed, "/\\") {
+		return errors.New("session name must not contain path separators")
+	}
+	if strings.IndexFunc(trimmed, func(r rune) bool {
+		return unicode.IsSpace(r) || unicode.IsControl(r)
+	}) != -1 {
+		return errors.New("session name must not contain whitespace or control characters")
+	}
+	if len(trimmed) > 64 {
+		return errors.New("session name must be 64 characters or fewer")
+	}
+	return nil
 }
 
 func sessionFilePath(name string) (string, error) {
@@ -42,8 +64,8 @@ func sessionFilePath(name string) (string, error) {
 }
 
 func SaveSessionMetadata(name, directory string) error {
-	if strings.TrimSpace(name) == "" {
-		return errors.New("session name is required")
+	if err := ValidateSessionName(name); err != nil {
+		return err
 	}
 
 	meta := SessionMetadata{

@@ -40,45 +40,50 @@ func (t TextInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return t, nil
 			}
 
-			cfg := GetConfig()
-			switch t.action {
-			case "new":
-				if err := CreateSession(t.value); err != nil {
-					TmuxDisplay("Failed to create session: " + err.Error())
-					return NewMenuModel(), nil
+				if err := ValidateSessionName(t.value); err != nil {
+					TmuxDisplay("Invalid session name: " + err.Error())
+					return t, nil
 				}
-				if cfg.AutoSwitch {
-					if err := SwitchSession(t.value); err != nil {
-						TmuxDisplay("Created session but failed to switch: " + err.Error())
+
+				cfg := GetConfig()
+				switch t.action {
+				case "new":
+					if err := CreateSession(t.value); err != nil {
+						TmuxDisplay("Failed to create session: " + err.Error())
 						return NewMenuModel(), nil
 					}
-				}
-				TmuxDisplay("Created session: " + t.value)
+					if cfg.AutoSwitch {
+						if err := SwitchSession(t.value); err != nil {
+							TmuxDisplay("Created session but failed to switch: " + err.Error())
+							return NewMenuModel(), nil
+						}
+					}
+					TmuxDisplay("Created session: " + t.value)
 
-			case "rename":
-				if t.oldName != "" {
-					if err := RenameSession(t.oldName, t.value); err != nil {
-						TmuxDisplay("Failed to rename session: " + err.Error())
+				case "rename":
+					if t.oldName != "" {
+						if err := RenameSession(t.oldName, t.value); err != nil {
+							TmuxDisplay("Failed to rename session: " + err.Error())
+							return NewMenuModel(), nil
+						}
+						TmuxDisplay("Renamed: " + t.oldName + " → " + t.value)
+					}
+
+				case "save":
+					if err := SaveSession(t.value, cfg.DefaultDirectory); err != nil {
+						TmuxDisplay("Failed to save session: " + err.Error())
 						return NewMenuModel(), nil
 					}
-					TmuxDisplay("Renamed: " + t.oldName + " → " + t.value)
-				}
+					TmuxDisplay("Saved session definition: " + t.value)
 
-			case "save":
-				if err := SaveSession(t.value, cfg.DefaultDirectory); err != nil {
-					TmuxDisplay("Failed to save session: " + err.Error())
-					return NewMenuModel(), nil
+				case "restore":
+					if err := RestoreSession(t.value); err != nil {
+						TmuxDisplay("Failed to restore session: " + err.Error())
+						return NewMenuModel(), nil
+					}
+					TmuxDisplay("Restored session: " + t.value)
 				}
-				TmuxDisplay("Saved session definition: " + t.value)
-
-			case "restore":
-				if err := RestoreSession(t.value); err != nil {
-					TmuxDisplay("Failed to restore session: " + err.Error())
-					return NewMenuModel(), nil
-				}
-				TmuxDisplay("Restored session: " + t.value)
-			}
-			return NewMenuModel(), nil
+				return NewMenuModel(), nil
 		case "backspace":
 			if len(t.value) > 0 {
 				t.value = t.value[:len(t.value)-1]

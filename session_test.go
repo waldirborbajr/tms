@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -74,4 +75,38 @@ func TestListSavedSessions(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(sessionDirPath, "alpha.json")); err != nil {
 		t.Fatalf("expected alpha metadata file to exist: %v", err)
 	}
+}
+func TestValidateSessionName(t *testing.T) {
+    cases := []struct {
+        name string
+        wantErr bool
+    }{
+        {"valid-name", false},
+        {"workspace1", false},
+        {"", true},
+        {" ", true},
+        {"bad/name", true},
+        {"bad\\name", true},
+        {"bad name", true},
+        {"\tname", true},
+        {strings.Repeat("a", 65), true},
+    }
+
+    for _, c := range cases {
+        err := ValidateSessionName(c.name)
+        if (err != nil) != c.wantErr {
+            t.Fatalf("ValidateSessionName(%q) wantErr=%v got %v", c.name, c.wantErr, err)
+        }
+    }
+}
+
+func TestSaveSessionMetadataRejectsInvalidName(t *testing.T) {
+    tempHome := t.TempDir()
+    oldHome := os.Getenv("HOME")
+    os.Setenv("HOME", tempHome)
+    defer os.Setenv("HOME", oldHome)
+
+    if err := SaveSessionMetadata("bad/name", ""); err == nil {
+        t.Fatal("expected SaveSessionMetadata to reject invalid name")
+    }
 }

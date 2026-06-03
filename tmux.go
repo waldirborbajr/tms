@@ -44,6 +44,9 @@ func CreateSession(name string) error {
 
 // CreateSessionWithDir creates a new tmux session in a specific directory
 func CreateSessionWithDir(name, directory string) error {
+	if err := ValidateSessionName(name); err != nil {
+		return err
+	}
 	cmd := []string{"new-session", "-d", "-s", name}
 	if directory != "" {
 		cmd = append(cmd, "-c", directory)
@@ -54,18 +57,30 @@ func CreateSessionWithDir(name, directory string) error {
 
 // SwitchSession switches to a different session
 func SwitchSession(name string) error {
+	if err := ValidateSessionName(name); err != nil {
+		return err
+	}
 	_, err := RunTmux("switch-client", "-t", name)
 	return err
 }
 
 // KillSession terminates a session
 func KillSession(name string) error {
+	if err := ValidateSessionName(name); err != nil {
+		return err
+	}
 	_, err := RunTmux("kill-session", "-t", name)
 	return err
 }
 
 // RenameSession renames an existing session
 func RenameSession(oldName, newName string) error {
+	if err := ValidateSessionName(oldName); err != nil {
+		return err
+	}
+	if err := ValidateSessionName(newName); err != nil {
+		return err
+	}
 	_, err := RunTmux("rename-session", "-t", oldName, newName)
 	return err
 }
