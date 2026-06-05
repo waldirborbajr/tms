@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="256" height="256" src="./assets/tms-logo.jpg" />
+  <img width="256" height="256" src="./assets/tms-logo.png" />
 </p>
 <h1 align="center">TMS, A clean, fast, and modern tmux session manager written in Go</h1>
 
