@@ -3,65 +3,106 @@ package main
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
-// renderVersion returns the formatted version info box as a string.
-func renderVersion() string {
-	var s strings.Builder
-	s.WriteString("\n")
-	s.WriteString("┌─────────────────────────────────────┐\n")
-	s.WriteString(fmt.Sprintf("│ tms v%s\n", Version))
-	s.WriteString("├─────────────────────────────────────┤\n")
-	s.WriteString(fmt.Sprintf("│ Git Commit  : %-20s │\n", GitCommit))
-	s.WriteString(fmt.Sprintf("│ Built       : %-20s │\n", BuildTime))
-	s.WriteString("└─────────────────────────────────────┘\n")
-	s.WriteString("\n")
-	return s.String()
-}
+// Variáveis de build (substituídas em tempo de compilação)
+var (
+	Version   = "dev"
+	GitCommit = "unknown"
+	BuildTime = "unknown"
+)
 
-// renderConfig returns the formatted configuration box as a string.
-func renderConfig() string {
-	cfg := GetConfig()
-	var s strings.Builder
-	s.WriteString("\n")
-	s.WriteString("┌──────────────────────────────────────┐\n")
-	s.WriteString("│ TMS Configuration\n")
-	s.WriteString("├──────────────────────────────────────┤\n")
-	s.WriteString(fmt.Sprintf("│ Default Session  : %-18s │\n", cfg.DefaultSession))
-	s.WriteString(fmt.Sprintf("│ Default Directory: %-18s │\n", cfg.DefaultDirectory))
-	s.WriteString(fmt.Sprintf("│ Auto Switch      : %-18v │\n", cfg.AutoSwitch))
-	s.WriteString(fmt.Sprintf("│ Theme            : %-18s │\n", cfg.Theme))
-	s.WriteString("└──────────────────────────────────────┘\n")
-	s.WriteString("\n")
-	return s.String()
-}
+// DisplaySessions exibe a lista de sessões formatada
+func DisplaySessions() string {
+	sessions := ListSessionsSafe()
 
-// renderSessionList returns the formatted session list as a string.
-func renderSessionList() string {
-	sessions := ListSessions()
 	if len(sessions) == 0 {
-		return "No active tmux sessions.\n"
+		return "📭 Nenhuma sessão ativa"
 	}
-	var s strings.Builder
-	s.WriteString("Active sessions:\n")
-	for _, sess := range sessions {
-		s.WriteString(fmt.Sprintf(" • %s (%s)\n", sess, GetSessionInfo(sess)))
+
+	var b strings.Builder
+	b.WriteString("📋 Sessões ativas:\n")
+
+	for _, name := range sessions {
+		info := GetSessionInfoSafe(name)
+		attached := ""
+		if info != nil && info.Attached {
+			attached = " 🔗 attached"
+		}
+		b.WriteString(fmt.Sprintf("  - %s%s\n", name, attached))
 	}
-	return s.String()
+
+	return b.String()
 }
 
-func renderSavedSessionList() string {
-	saved, err := ListSavedSessions()
-	if err != nil {
-		return fmt.Sprintf("Failed to load saved sessions: %v\n", err)
+// DisplayConfig exibe a configuração atual
+func DisplayConfig() string {
+	return "⚙️ Configuração atual:\n" +
+		"  default_session: main\n" +
+		"  default_directory: \n" +
+		"  auto_switch: true\n" +
+		"  theme: default"
+}
+
+// DisplayVersion exibe a versão
+func DisplayVersion() string {
+	return fmt.Sprintf("tms %s (build: %s, commit: %s)", Version, BuildTime, GitCommit)
+}
+
+// RenderMenu renderiza o menu principal com estilo
+func RenderMenu(title string, items []string, cursor int, filterActive bool, filterText string) string {
+	var b strings.Builder
+
+	titleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00FF00")).
+		Bold(true).
+		MarginBottom(1)
+
+	b.WriteString(titleStyle.Render(title))
+	b.WriteString("\n\n")
+
+	// Barra de filtro
+	if filterActive {
+		filterStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("#333333")).
+			Padding(0, 1).
+			MarginBottom(1)
+		b.WriteString(filterStyle.Render("🔍 " + filterText + "▌"))
+		b.WriteString("\n\n")
 	}
-	if len(saved) == 0 {
-		return "No saved sessions found.\n"
+
+	// Lista de itens
+	for i, item := range items {
+		cursorMarker := " "
+		if i == cursor {
+			cursorMarker = ">"
+		}
+		style := lipgloss.NewStyle()
+		if i == cursor {
+			style = style.Foreground(lipgloss.Color("#00FF00")).Bold(true)
+		}
+		b.WriteString(style.Render(fmt.Sprintf("%s %s", cursorMarker, item)))
+		b.WriteString("\n")
 	}
-	var s strings.Builder
-	s.WriteString("Saved sessions:\n")
-	for _, name := range saved {
-		s.WriteString(fmt.Sprintf(" • %s\n", name))
+
+	// Dicas
+	helpStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#666666")).
+		MarginTop(1)
+
+	help := "↑/↓: navigate • enter: select • q: quit • /: filter"
+	if filterActive {
+		help = "🔍 filter mode: type to search • enter: select • esc: cancel"
 	}
-	return s.String()
+	b.WriteString(helpStyle.Render(help))
+
+	return b.String()
+}
+
+// TmuxDisplayMsg exibe uma mensagem no tmux (para integração)
+func TmuxDisplayMsg(msg string) {
+	// Esta função é um wrapper para TmuxDisplay (definida em tmux.go)
+	TmuxDisplay(msg)
 }

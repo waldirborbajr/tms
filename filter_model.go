@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// FilterModel gerencia o estado da pesquisa/filtro na TUI
 type FilterModel struct {
 	Text      string
 	Active    bool
@@ -19,7 +18,6 @@ type FilterModel struct {
 	OnConfirm func(string)
 }
 
-// NewFilterModel cria um novo modelo de filtro
 func NewFilterModel(items []string) *FilterModel {
 	return &FilterModel{
 		Text:     "",
@@ -30,12 +28,10 @@ func NewFilterModel(items []string) *FilterModel {
 	}
 }
 
-// Init implementa tea.Model
 func (f *FilterModel) Init() tea.Cmd {
 	return nil
 }
 
-// Update implementa tea.Model
 func (f *FilterModel) Update(msg tea.Msg) (*FilterModel, tea.Cmd) {
 	if !f.Active {
 		return f, nil
@@ -80,7 +76,6 @@ func (f *FilterModel) Update(msg tea.Msg) (*FilterModel, tea.Cmd) {
 			return f, nil
 
 		default:
-			// Adicionar caractere ao texto do filtro
 			if len(msg.String()) == 1 {
 				f.Text += msg.String()
 				f.applyFilter()
@@ -91,7 +86,6 @@ func (f *FilterModel) Update(msg tea.Msg) (*FilterModel, tea.Cmd) {
 	return f, nil
 }
 
-// applyFilter aplica o filtro atual à lista de itens
 func (f *FilterModel) applyFilter() {
 	if f.Text == "" {
 		f.Filtered = f.AllItems
@@ -118,13 +112,11 @@ func (f *FilterModel) applyFilter() {
 	}
 }
 
-// SetItems atualiza a lista de itens
 func (f *FilterModel) SetItems(items []string) {
 	f.AllItems = items
 	f.applyFilter()
 }
 
-// View renderiza o campo de filtro
 func (f *FilterModel) View() string {
 	if !f.Active {
 		return ""
@@ -148,7 +140,6 @@ func (f *FilterModel) View() string {
 	return prompt + input
 }
 
-// Toggle ativa/desativa o filtro
 func (f *FilterModel) Toggle() {
 	f.Active = !f.Active
 	if f.Active {
@@ -158,17 +149,14 @@ func (f *FilterModel) Toggle() {
 	}
 }
 
-// IsActive retorna se o filtro está ativo
 func (f *FilterModel) IsActive() bool {
 	return f.Active
 }
 
-// GetFiltered retorna a lista filtrada
 func (f *FilterModel) GetFiltered() []string {
 	return f.Filtered
 }
 
-// GetSelected retorna o item selecionado
 func (f *FilterModel) GetSelected() string {
 	if len(f.Filtered) > 0 && f.Selected < len(f.Filtered) {
 		return f.Filtered[f.Selected]

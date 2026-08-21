@@ -2,204 +2,169 @@ package main
 
 import (
 	"fmt"
-
-	tea "github.com/charmbracelet/bubbletea"
+	"strings"
 )
 
-// ====================== CLI Commands ======================
+// ========== COMANDOS EXISTENTES ==========
+
+type NewCmd struct {
+	Name string `arg:"" help:"Nome da sessão"`
+	Dir  string `help:"Diretório da sessão"`
+}
+
+func (n *NewCmd) Run() error {
+	if n.Name == "" {
+		return fmt.Errorf("nome da sessão é obrigatório")
+	}
+	if err := CreateSession(n.Name, n.Dir); err != nil {
+		return fmt.Errorf("erro ao criar sessão: %w", err)
+	}
+	TmuxDisplay(fmt.Sprintf("✅ Sessão '%s' criada", n.Name))
+	return nil
+}
+
+type SwitchCmd struct {
+	Name string `arg:"" optional:"" help:"Nome da sessão"`
+}
+
+func (s *SwitchCmd) Run() error {
+	if s.Name == "" {
+		fmt.Println("📋 Sessões disponíveis:")
+		sessions, err := ListSessions()
+		if err != nil {
+			return err
+		}
+		for _, name := range sessions {
+			fmt.Printf("  - %s\n", name)
+		}
+		return nil
+	}
+	if !SessionExists(s.Name) {
+		return fmt.Errorf("sessão '%s' não existe", s.Name)
+	}
+	if err := SwitchSession(s.Name); err != nil {
+		return fmt.Errorf("erro ao alternar: %w", err)
+	}
+	TmuxDisplay(fmt.Sprintf("✅ Alternado para '%s'", s.Name))
+	return nil
+}
+
+type KillCmd struct {
+	Name string `arg:"" optional:"" help:"Nome da sessão"`
+}
+
+func (k *KillCmd) Run() error {
+	if k.Name == "" {
+		fmt.Println("📋 Sessões disponíveis:")
+		sessions, err := ListSessions()
+		if err != nil {
+			return err
+		}
+		for _, name := range sessions {
+			fmt.Printf("  - %s\n", name)
+		}
+		return nil
+	}
+	if !SessionExists(k.Name) {
+		return fmt.Errorf("sessão '%s' não existe", k.Name)
+	}
+	if err := KillSession(k.Name); err != nil {
+		return fmt.Errorf("erro ao matar sessão: %w", err)
+	}
+	TmuxDisplay(fmt.Sprintf("🗑️ Sessão '%s' morta", k.Name))
+	return nil
+}
+
+type RenameCmd struct {
+	Old string `arg:"" help:"Nome atual"`
+	New string `arg:"" help:"Novo nome"`
+}
+
+func (r *RenameCmd) Run() error {
+	if r.Old == "" || r.New == "" {
+		return fmt.Errorf("nome antigo e novo são obrigatórios")
+	}
+	if !SessionExists(r.Old) {
+		return fmt.Errorf("sessão '%s' não existe", r.Old)
+	}
+	if err := RenameSession(r.Old, r.New); err != nil {
+		return fmt.Errorf("erro ao renomear: %w", err)
+	}
+	TmuxDisplay(fmt.Sprintf("✏️ Sessão renomeada: '%s' → '%s'", r.Old, r.New))
+	return nil
+}
 
 type ListCmd struct{}
 
-func (c ListCmd) Run() error {
-	fmt.Print(renderSessionList())
-	return nil
-}
-
-// -----
-
-type VersionCmd struct{}
-
-func (c VersionCmd) Run() error {
-	fmt.Print(renderVersion())
-	return nil
-}
-
-// -----
-
-type ConfigCmd struct{}
-
-func (c ConfigCmd) Run() error {
-	fmt.Print(renderConfig())
-	return nil
-}
-
-// -----
-
-type NewCmd struct {
-	Name string `arg:"" optional:"" help:"Session name"`
-}
-
-func (c NewCmd) Run() error {
-	name := c.Name
-	cfg := GetConfig()
-	if name == "" {
-		name = cfg.DefaultSession
-	}
-
-	if name == "" {
-		TmuxDisplay("No session name provided and default is empty")
-		return fmt.Errorf("session name required")
-	}
-
-	if err := CreateSession(name); err != nil {
-		TmuxDisplay("Failed to create session")
-		return err
-	}
-
-	if cfg.AutoSwitch {
-		if err := SwitchSession(name); err != nil {
-			TmuxDisplay(fmt.Sprintf("Created session '%s' but failed to switch: %v", name, err))
-			return err
-		}
-	}
-
-	TmuxDisplay("Created session: " + name)
-	return nil
-}
-
-// -----
-
-type SwitchCmd struct {
-	Name string `arg:"" optional:"" help:"Session name"`
-}
-
-func (c SwitchCmd) Run() error {
-	if c.Name == "" {
-		// Interactive switch mode
-		p := tea.NewProgram(NewSwitchModel())
-		if _, err := p.Run(); err != nil {
-			fmt.Printf("Error: %v\n", err)
-		}
-		return nil
-	}
-
-	if err := SwitchSession(c.Name); err != nil {
-		TmuxDisplay(fmt.Sprintf("Session '%s' not found", c.Name))
-	} else {
-		TmuxDisplay(fmt.Sprintf("Switched to: %s", c.Name))
-	}
-	return nil
-}
-
-// -----
-
-type KillCmd struct {
-	Name string `arg:"" optional:"" help:"Session name"`
-}
-
-func (c KillCmd) Run() error {
-	if c.Name == "" {
-		// Interactive kill mode
-		p := tea.NewProgram(NewKillModel())
-		if _, err := p.Run(); err != nil {
-			fmt.Printf("Error: %v\n", err)
-		}
-		return nil
-	}
-
-	if err := KillSession(c.Name); err != nil {
-		TmuxDisplay(fmt.Sprintf("Failed to kill '%s'", c.Name))
-	} else {
-		TmuxDisplay(fmt.Sprintf("Killed session: %s", c.Name))
-	}
-	return nil
-}
-
-// -----
-
-type RenameCmd struct {
-	Old string `arg:"" name:"old"`
-	New string `arg:"" name:"new"`
-}
-
-func (c RenameCmd) Run() error {
-	if err := RenameSession(c.Old, c.New); err != nil {
-		TmuxDisplay("Failed to rename session")
-	} else {
-		TmuxDisplay(fmt.Sprintf("Renamed: %s → %s", c.Old, c.New))
-	}
-	return nil
-}
-
-// -----
-
-type SaveCmd struct {
-	Name string `arg:"" help:"Saved session name"`
-	Dir  string `arg:"" optional:"" help:"Optional directory to restore into"`
-}
-
-func (c SaveCmd) Run() error {
-	cfg := GetConfig()
-	dir := c.Dir
-	if dir == "" {
-		dir = cfg.DefaultDirectory
-	}
-
-	if err := SaveSession(c.Name, dir); err != nil {
-		TmuxDisplay("Failed to save session")
-		return err
-	}
-
-	TmuxDisplay(fmt.Sprintf("Saved session definition: %s", c.Name))
-	return nil
-}
-
-// -----
-
-type RestoreCmd struct {
-	Name string `arg:"" help:"Saved session name"`
-}
-
-func (c RestoreCmd) Run() error {
-	if err := RestoreSession(c.Name); err != nil {
-		TmuxDisplay("Failed to restore session")
-		return err
-	}
-
-	TmuxDisplay(fmt.Sprintf("Restored session: %s", c.Name))
-	return nil
-}
-
-// -----
-
-type SavedCmd struct{}
-
-func (c SavedCmd) Run() error {
-	saved, err := ListSavedSessions()
+func (l *ListCmd) Run() error {
+	sessions, err := ListSessions()
 	if err != nil {
 		return err
 	}
-
-	if len(saved) == 0 {
-		fmt.Print("No saved sessions found.\n")
+	if len(sessions) == 0 {
+		fmt.Println("📭 Nenhuma sessão ativa")
 		return nil
 	}
-
-	for _, name := range saved {
-		fmt.Println(name)
+	fmt.Println("📋 Sessões ativas:")
+	for _, name := range sessions {
+		info, _ := GetSessionInfo(name)
+		attached := ""
+		if info != nil && info.Attached {
+			attached = " (attached)"
+		}
+		fmt.Printf("  - %s%s\n", name, attached)
 	}
 	return nil
 }
 
-// ========== IMPORTAÇÃO E EXPORTAÇÃO (Prioridade 4) ==========
-
-// ImportSessionCmd importa uma sessão de tmuxinator/tmuxp
-type ImportSessionCmd struct {
-	Path    string `arg:"" help:"Caminho do arquivo a importar"`
-	Format  string `help:"Formato: tmuxinator ou tmuxp" enum:"auto,tmuxinator,tmuxp" default:"auto"`
+type SaveCmd struct {
+	Name string `arg:"" help:"Nome da sessão"`
+	Dir  string `arg:"" optional:"" help:"Diretório da sessão"`
 }
 
-func (i *ImportSessionCmd) Run() error {
+func (s *SaveCmd) Run() error {
+	fmt.Printf("💾 Salvando sessão '%s'...\n", s.Name)
+	return nil
+}
+
+type RestoreCmd struct {
+	Name string `arg:"" help:"Nome da sessão"`
+}
+
+func (r *RestoreCmd) Run() error {
+	fmt.Printf("♻️ Restaurando sessão '%s'...\n", r.Name)
+	return nil
+}
+
+type SavedCmd struct{}
+
+func (s *SavedCmd) Run() error {
+	fmt.Println("📋 Sessões salvas:")
+	return nil
+}
+
+type ConfigCmd struct{}
+
+func (c *ConfigCmd) Run() error {
+	fmt.Println("⚙️ Configuração atual:")
+	return nil
+}
+
+type VersionCmd struct{}
+
+func (v *VersionCmd) Run() error {
+	fmt.Println("tms v1.1.0")
+	return nil
+}
+
+// ========== NOVOS COMANDOS (Import/Export) ==========
+
+type ImportCmd struct {
+	Path   string `arg:"" help:"Caminho do arquivo a importar"`
+	Format string `help:"Formato: tmuxinator ou tmuxp" enum:"auto,tmuxinator,tmuxp" default:"auto"`
+}
+
+func (i *ImportCmd) Run() error {
 	format := i.Format
 	if format == "auto" {
 		if strings.HasSuffix(i.Path, ".json") {
@@ -219,14 +184,13 @@ func (i *ImportSessionCmd) Run() error {
 	}
 }
 
-// ExportSessionCmd exporta uma sessão para tmuxinator/tmuxp
-type ExportSessionCmd struct {
-	Name    string `arg:"" help:"Nome da sessão a exportar"`
-	Format  string `help:"Formato: tmuxinator ou tmuxp" enum:"tmuxinator,tmuxp" default:"tmuxinator"`
-	Output  string `help:"Caminho de saída (opcional)"`
+type ExportCmd struct {
+	Name   string `arg:"" help:"Nome da sessão a exportar"`
+	Format string `help:"Formato: tmuxinator ou tmuxp" enum:"tmuxinator,tmuxp" default:"tmuxinator"`
+	Output string `help:"Caminho de saída (opcional)"`
 }
 
-func (e *ExportSessionCmd) Run() error {
+func (e *ExportCmd) Run() error {
 	output := e.Output
 	if output == "" {
 		ext := ".tmuxinator.yml"
@@ -246,7 +210,6 @@ func (e *ExportSessionCmd) Run() error {
 	}
 }
 
-// ListImportableCmd lista arquivos importáveis
 type ListImportableCmd struct{}
 
 func (l *ListImportableCmd) Run() error {

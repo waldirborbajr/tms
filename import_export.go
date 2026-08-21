@@ -10,7 +10,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// TmuxinatorConfig representa a estrutura de um projeto tmuxinator
+// Estruturas para tmuxinator
 type TmuxinatorConfig struct {
 	Name     string            `toml:"name"`
 	Root     string            `toml:"root"`
@@ -20,7 +20,6 @@ type TmuxinatorConfig struct {
 	PreWindow string           `toml:"pre_window"`
 }
 
-// TmuxinatorWindow representa uma janela no tmuxinator
 type TmuxinatorWindow struct {
 	Name     string   `toml:"name"`
 	Panes    []string `toml:"panes"`
@@ -28,7 +27,7 @@ type TmuxinatorWindow struct {
 	Commands []string `toml:"commands,omitempty"`
 }
 
-// TmuxpConfig representa a estrutura de um projeto tmuxp
+// Estruturas para tmuxp
 type TmuxpConfig struct {
 	Name          string                 `json:"session_name"`
 	StartDirectory string                `json:"start_directory"`
@@ -36,7 +35,6 @@ type TmuxpConfig struct {
 	GlobalOptions map[string]interface{} `json:"global_options"`
 }
 
-// TmuxpWindow representa uma janela no tmuxp
 type TmuxpWindow struct {
 	Name     string   `json:"window_name"`
 	Panes    []string `json:"panes"`
@@ -45,11 +43,10 @@ type TmuxpWindow struct {
 	Options  map[string]interface{} `json:"options,omitempty"`
 }
 
-// ImportTmuxinator importa uma configuração do tmuxinator
+// Importar do tmuxinator
 func ImportTmuxinator(path string) error {
 	var config TmuxinatorConfig
 
-	// Ler arquivo TOML
 	if _, err := toml.DecodeFile(path, &config); err != nil {
 		return fmt.Errorf("erro ao ler tmuxinator config: %w", err)
 	}
@@ -58,13 +55,11 @@ func ImportTmuxinator(path string) error {
 		return fmt.Errorf("nome da sessão não encontrado no arquivo")
 	}
 
-	// Criar diretório de sessões salvas se não existir
 	sessionsDir := getSessionsDir()
 	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
 		return fmt.Errorf("erro ao criar diretório: %w", err)
 	}
 
-	// Converter para formato nativo do tms
 	session := SessionDefinition{
 		Name:        config.Name,
 		Directory:   config.Root,
@@ -94,7 +89,6 @@ func ImportTmuxinator(path string) error {
 		}
 
 		if len(window.Panes) == 0 {
-			// Adicionar pane padrão se não houver
 			window.Panes = append(window.Panes, PaneDefinition{
 				Command: "bash",
 			})
@@ -103,7 +97,6 @@ func ImportTmuxinator(path string) error {
 		session.Windows = append(session.Windows, window)
 	}
 
-	// Salvar no formato tms
 	sessionFile := filepath.Join(sessionsDir, config.Name+".toml")
 	if err := saveSessionDefinition(sessionFile, session); err != nil {
 		return fmt.Errorf("erro ao salvar sessão: %w", err)
@@ -113,7 +106,7 @@ func ImportTmuxinator(path string) error {
 	return nil
 }
 
-// ImportTmuxp importa uma configuração do tmuxp
+// Importar do tmuxp
 func ImportTmuxp(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -171,9 +164,8 @@ func ImportTmuxp(path string) error {
 	return nil
 }
 
-// ExportTmuxinator exporta uma sessão para formato tmuxinator
+// Exportar para tmuxinator
 func ExportTmuxinator(name string, outputPath string) error {
-	// Carregar definição da sessão
 	session, err := loadSessionDefinition(name)
 	if err != nil {
 		return fmt.Errorf("erro ao carregar sessão: %w", err)
@@ -202,7 +194,6 @@ func ExportTmuxinator(name string, outputPath string) error {
 		config.Windows = append(config.Windows, window)
 	}
 
-	// Escrever arquivo TOML
 	f, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("erro ao criar arquivo: %w", err)
@@ -218,7 +209,7 @@ func ExportTmuxinator(name string, outputPath string) error {
 	return nil
 }
 
-// ExportTmuxp exporta uma sessão para formato tmuxp
+// Exportar para tmuxp
 func ExportTmuxp(name string, outputPath string) error {
 	session, err := loadSessionDefinition(name)
 	if err != nil {
@@ -261,7 +252,7 @@ func ExportTmuxp(name string, outputPath string) error {
 	return nil
 }
 
-// ListImportable lista arquivos importáveis de tmuxinator/tmuxp
+// Listar arquivos importáveis
 func ListImportable() ([]string, error) {
 	patterns := []string{
 		"*.tmuxinator.yml",
@@ -280,7 +271,6 @@ func ListImportable() ([]string, error) {
 		}
 	}
 
-	// Verificar também o diretório ~/.tmuxinator/
 	home, err := os.UserHomeDir()
 	if err == nil {
 		tmuxinatorDir := filepath.Join(home, ".tmuxinator")
@@ -293,7 +283,6 @@ func ListImportable() ([]string, error) {
 		}
 	}
 
-	// Verificar também ~/.tmuxp/
 	if err == nil {
 		tmuxpDir := filepath.Join(home, ".tmuxp")
 		if files, err := os.ReadDir(tmuxpDir); err == nil {

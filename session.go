@@ -1,174 +1,15 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode"
+
+	"github.com/BurntSushi/toml"
 )
 
-// SessionMetadata stores persistent session definition details.
-type SessionMetadata struct {
-	Name      string `json:"name"`
-	Directory string `json:"directory,omitempty"`
-}
-
-func sessionStorageDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	path := filepath.Join(home, configDir, "sessions")
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-func sessionFileName(name string) string {
-	safeName := strings.ReplaceAll(name, string(filepath.Separator), "_")
-	safeName = strings.ReplaceAll(safeName, "/", "_")
-	safeName = strings.ReplaceAll(safeName, "\\", "_")
-	return fmt.Sprintf("%s.json", safeName)
-}
-
-func ValidateSessionName(name string) error {
-	trimmed := strings.TrimSpace(name)
-	if trimmed == "" {
-		return errors.New("session name is required")
-	}
-	if strings.ContainsAny(trimmed, "/\\") {
-		return errors.New("session name must not contain path separators")
-	}
-	if strings.IndexFunc(trimmed, func(r rune) bool {
-		return unicode.IsSpace(r) || unicode.IsControl(r)
-	}) != -1 {
-		return errors.New("session name must not contain whitespace or control characters")
-	}
-	if len(trimmed) > 64 {
-		return errors.New("session name must be 64 characters or fewer")
-	}
-	return nil
-}
-
-func sessionFilePath(name string) (string, error) {
-	dir, err := sessionStorageDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, sessionFileName(name)), nil
-}
-
-func SaveSessionMetadata(name, directory string) error {
-	if err := ValidateSessionName(name); err != nil {
-		return err
-	}
-
-	meta := SessionMetadata{
-		Name:      name,
-		Directory: directory,
-	}
-	data, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	path, err := sessionFilePath(name)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(path, data, 0644)
-}
-
-func LoadSessionMetadata(name string) (SessionMetadata, error) {
-	path, err := sessionFilePath(name)
-	if err != nil {
-		return SessionMetadata{}, err
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return SessionMetadata{}, err
-	}
-
-	var meta SessionMetadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return SessionMetadata{}, err
-	}
-	return meta, nil
-}
-
-func ListSavedSessions() ([]string, error) {
-	dir, err := sessionStorageDir()
-	if err != nil {
-		return nil, err
-	}
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	var saved []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if strings.HasSuffix(name, ".json") {
-			saved = append(saved, strings.TrimSuffix(name, ".json"))
-		}
-	}
-	return saved, nil
-}
-
-func SaveSession(name, directory string) error {
-	return SaveSessionMetadata(name, directory)
-}
-
-func containsSession(name string, sessions []string) bool {
-	for _, s := range sessions {
-		if s == name {
-			return true
-		}
-	}
-	return false
-}
-
-func RestoreSession(name string) error {
-	meta, err := LoadSessionMetadata(name)
-	if err != nil {
-		return err
-	}
-
-	if containsSession(name, ListSessions()) {
-		return SwitchSession(name)
-	}
-
-	dir := meta.Directory
-	if dir == "" {
-		dir = GetConfig().DefaultDirectory
-	}
-
-	if err := CreateSessionWithDir(name, dir); err != nil {
-		return err
-	}
-
-	if GetConfig().AutoSwitch {
-		return SwitchSession(name)
-	}
-
-	return nil
-}
-
-// ========== DEFINIÇÕES DE SESSÃO PARA IMPORTAÇÃO/EXPORTAÇÃO ==========
-
-// SessionDefinition representa uma definição de sessão
+// SessionDefinition representa uma definição de sessão salva
 type SessionDefinition struct {
 	Name        string
 	Directory   string
@@ -191,7 +32,10 @@ type PaneDefinition struct {
 
 // getSessionsDir retorna o diretório de sessões salvas
 func getSessionsDir() string {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
 	return filepath.Join(home, ".config", "tms", "sessions")
 }
 
@@ -206,12 +50,57 @@ func loadSessionDefinition(name string) (SessionDefinition, error) {
 }
 
 // saveSessionDefinition salva uma definição de sessão
-func saveSessionDefinition(path string, session SessionDefinition) error {
-	f, err := os.Create(path)
+func saveSessionDefinition(name string, session SessionDefinition) error {
+	sessionsDir := getSessionsDir()
+	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
+		return err
+	}
+
+	sessionFile := filepath.Join(sessionsDir, name+".toml")
+	f, err := os.Create(sessionFile)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
+
 	encoder := toml.NewEncoder(f)
 	return encoder.Encode(session)
+}
+
+// ListSavedSessions lista sessões salvas
+func ListSavedSessions() ([]string, error) {
+	sessionsDir := getSessionsDir()
+	files, err := os.ReadDir(sessionsDir)
+	if err != nil {
+		return []string{}, nil
+	}
+
+	var names []string
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".toml") {
+			name := strings.TrimSuffix(file.Name(), ".toml")
+			names = append(names, name)
+		}
+	}
+	return names, nil
+}
+
+// ========== FUNÇÕES AUXILIARES PARA COMPATIBILIDADE ==========
+
+// ListSessionsSafe retorna lista de sessões (1 valor, ignora erro)
+func ListSessionsSafe() []string {
+	sessions, err := ListSessions()
+	if err != nil {
+		return []string{}
+	}
+	return sessions
+}
+
+// GetSessionInfoSafe retorna info da sessão (1 valor, ignora erro)
+func GetSessionInfoSafe(name string) *TmuxSession {
+	info, err := GetSessionInfo(name)
+	if err != nil {
+		return nil
+	}
+	return info
 }

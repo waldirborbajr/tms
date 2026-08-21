@@ -1,18 +1,22 @@
 package main
 
-// ====================== CLI Structure ======================
-// This file defines the CLI command hierarchy for the application.
-// Uses github.com/alecthomas/kong for argument parsing.
+import (
+)
 
-type CLI struct {
-	New     NewCmd     `cmd:"" help:"Create a new session"`
-	Switch  SwitchCmd  `cmd:"" aliases:"s" help:"Switch to a session"`
-	Kill    KillCmd    `cmd:"" aliases:"k" help:"Kill a session"`
-	Rename  RenameCmd  `cmd:"" aliases:"r" help:"Rename a session"`
-	Save    SaveCmd    `cmd:"" help:"Save a session definition for restore"`
-	Restore RestoreCmd `cmd:"" help:"Restore a saved session"`
-	Saved   SavedCmd   `cmd:"" help:"List saved session definitions"`
-	List    ListCmd    `cmd:"" help:"List active sessions"`
-	Version VersionCmd `cmd:"" help:"Show version"`
-	Config  ConfigCmd  `cmd:"" help:"Show current configuration"`
+var CLI struct {
+	New    NewCmd    `cmd:"" help:"Criar nova sessão"`
+	Switch SwitchCmd `cmd:"" help:"Alternar para uma sessão" aliases:"s"`
+	Kill   KillCmd   `cmd:"" help:"Matar uma sessão" aliases:"k"`
+	Rename RenameCmd `cmd:"" help:"Renomear uma sessão" aliases:"r"`
+	List   ListCmd   `cmd:"" help:"Listar sessões ativas"`
+	Save   SaveCmd   `cmd:"" help:"Salvar definição da sessão"`
+	Restore RestoreCmd `cmd:"" help:"Restaurar definição da sessão"`
+	Saved  SavedCmd  `cmd:"" help:"Listar sessões salvas"`
+	Config ConfigCmd `cmd:"" help:"Exibir configuração"`
+	Version VersionCmd `cmd:"" help:"Exibir versão"`
+
+	// Novos comandos
+	Import          ImportCmd          `cmd:"" help:"Importar sessão de tmuxinator/tmuxp"`
+	Export          ExportCmd          `cmd:"" help:"Exportar sessão para tmuxinator/tmuxp"`
+	ListImportable  ListImportableCmd  `cmd:"" help:"Listar arquivos importáveis"`
 }
