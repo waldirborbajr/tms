@@ -165,3 +165,53 @@ func RestoreSession(name string) error {
 
 	return nil
 }
+
+// ========== DEFINIÇÕES DE SESSÃO PARA IMPORTAÇÃO/EXPORTAÇÃO ==========
+
+// SessionDefinition representa uma definição de sessão
+type SessionDefinition struct {
+	Name        string
+	Directory   string
+	Windows     []WindowDefinition
+	PreCommands []string
+}
+
+// WindowDefinition representa uma janela na definição
+type WindowDefinition struct {
+	Name     string
+	Layout   string
+	Panes    []PaneDefinition
+	Commands []string
+}
+
+// PaneDefinition representa um painel na definição
+type PaneDefinition struct {
+	Command string
+}
+
+// getSessionsDir retorna o diretório de sessões salvas
+func getSessionsDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "tms", "sessions")
+}
+
+// loadSessionDefinition carrega uma definição de sessão
+func loadSessionDefinition(name string) (SessionDefinition, error) {
+	var session SessionDefinition
+	sessionFile := filepath.Join(getSessionsDir(), name+".toml")
+	if _, err := toml.DecodeFile(sessionFile, &session); err != nil {
+		return session, fmt.Errorf("erro ao carregar sessão: %w", err)
+	}
+	return session, nil
+}
+
+// saveSessionDefinition salva uma definição de sessão
+func saveSessionDefinition(path string, session SessionDefinition) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	encoder := toml.NewEncoder(f)
+	return encoder.Encode(session)
+}

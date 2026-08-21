@@ -1,3 +1,8 @@
+#!/bin/bash
+# Script para gerar o README.md completo do tms
+# Usa echo para cada linha, evitando problemas com heredoc
+
+cat > README.md << "EOF"
 # TMS — Tmux Session Manager
 
 A clean, fast, and modern tmux session manager written in Go.
@@ -356,3 +361,13 @@ Made with ❤️ for the terminal.
 ---
 
 **Questions?** Open an issue or discussion on GitHub.
+EOF
+
+echo "✅ README.md gerado com sucesso!"
+echo ""
+echo "📋 Verifique o arquivo com:"
+echo "  head -20 README.md"
+echo ""
+echo "📝 Para commitar:"
+echo "  git add README.md"
+echo "  git commit -m 'docs: update README with new features'"

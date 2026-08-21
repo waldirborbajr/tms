@@ -190,3 +190,77 @@ func (c SavedCmd) Run() error {
 	}
 	return nil
 }
+
+// ========== IMPORTAÇÃO E EXPORTAÇÃO (Prioridade 4) ==========
+
+// ImportSessionCmd importa uma sessão de tmuxinator/tmuxp
+type ImportSessionCmd struct {
+	Path    string `arg:"" help:"Caminho do arquivo a importar"`
+	Format  string `help:"Formato: tmuxinator ou tmuxp" enum:"auto,tmuxinator,tmuxp" default:"auto"`
+}
+
+func (i *ImportSessionCmd) Run() error {
+	format := i.Format
+	if format == "auto" {
+		if strings.HasSuffix(i.Path, ".json") {
+			format = "tmuxp"
+		} else {
+			format = "tmuxinator"
+		}
+	}
+
+	switch format {
+	case "tmuxinator":
+		return ImportTmuxinator(i.Path)
+	case "tmuxp":
+		return ImportTmuxp(i.Path)
+	default:
+		return fmt.Errorf("formato não suportado: %s", format)
+	}
+}
+
+// ExportSessionCmd exporta uma sessão para tmuxinator/tmuxp
+type ExportSessionCmd struct {
+	Name    string `arg:"" help:"Nome da sessão a exportar"`
+	Format  string `help:"Formato: tmuxinator ou tmuxp" enum:"tmuxinator,tmuxp" default:"tmuxinator"`
+	Output  string `help:"Caminho de saída (opcional)"`
+}
+
+func (e *ExportSessionCmd) Run() error {
+	output := e.Output
+	if output == "" {
+		ext := ".tmuxinator.yml"
+		if e.Format == "tmuxp" {
+			ext = ".tmuxp.json"
+		}
+		output = e.Name + ext
+	}
+
+	switch e.Format {
+	case "tmuxinator":
+		return ExportTmuxinator(e.Name, output)
+	case "tmuxp":
+		return ExportTmuxp(e.Name, output)
+	default:
+		return fmt.Errorf("formato não suportado: %s", e.Format)
+	}
+}
+
+// ListImportableCmd lista arquivos importáveis
+type ListImportableCmd struct{}
+
+func (l *ListImportableCmd) Run() error {
+	files, err := ListImportable()
+	if err != nil {
+		return err
+	}
+	if len(files) == 0 {
+		fmt.Println("Nenhum arquivo importável encontrado.")
+		return nil
+	}
+	fmt.Println("📋 Arquivos encontrados:")
+	for _, f := range files {
+		fmt.Printf("  %s\n", f)
+	}
+	return nil
+}
