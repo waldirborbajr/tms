@@ -1,116 +1,197 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-// MenuModel represents the main menu state
+// MenuModel representa o menu principal
 type MenuModel struct {
-	cursor int
+	Choices       []string
+	Cursor        int
+	Selected      int
+	Width         int
+	Height        int
+	Filter        *FilterModel
+	FilterActive  bool
+	Quit          bool
 }
 
-var menuOptions = []string{
-	"New Session",
-	"Switch Session",
-	"Kill Sessions",
-	"Rename Current Session",
-	"List Active Sessions",
-	"Save Current Session",
-	"Restore Saved Session",
-	"List Saved Sessions",
-	"Show Version",
-	"Show Config",
-	"Quit",
+// NewMenuModel cria um novo modelo de menu
+func NewMenuModel() *MenuModel {
+	items := []string{"New Session", "Switch Session", "Kill Session", "Rename Session", "List Sessions", "Save Session", "Restore Session", "Import Session", "Export Session", "Quit"}
+	return &MenuModel{
+		Choices:      items,
+		Cursor:       0,
+		Selected:     -1,
+		Filter:       NewFilterModel(items),
+		FilterActive: false,
+	}
 }
 
-// NewMenuModel creates a new menu model
-func NewMenuModel() MenuModel {
-	return MenuModel{cursor: 0}
-}
-
-func (m MenuModel) Init() tea.Cmd {
+// Init implementa tea.Model
+func (m *MenuModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update implementa tea.Model
+func (m *MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.FilterActive {
+		return m.updateFilter(msg)
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "esc", "ctrl+c":
+		case "ctrl+c", "q":
+			m.Quit = true
 			return m, tea.Quit
 
 		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
+			if m.Cursor > 0 {
+				m.Cursor--
 			}
+			return m, nil
 
 		case "down", "j":
-			if m.cursor < len(menuOptions)-1 {
-				m.cursor++
+			if m.Cursor < len(m.Choices)-1 {
+				m.Cursor++
 			}
+			return m, nil
 
 		case "enter":
-			return m.handleSelection()
+			m.Selected = m.Cursor
+			return m, m.handleSelection()
+
+		case "/":
+			m.FilterActive = true
+			m.Filter.Toggle()
+			return m, nil
+
+		default:
+			return m, nil
 		}
 	}
 	return m, nil
 }
 
-// handleSelection processes the selected menu option
-func (m MenuModel) handleSelection() (tea.Model, tea.Cmd) {
-	switch menuOptions[m.cursor] {
+// updateFilter atualiza o estado do filtro
+func (m *MenuModel) updateFilter(msg tea.Msg) (tea.Model, tea.Cmd) {
+	newFilter, cmd := m.Filter.Update(msg)
+	m.Filter = newFilter
+
+	if !m.Filter.IsActive() {
+		m.FilterActive = false
+		// Restaurar lista original
+		m.Choices = []string{"New Session", "Switch Session", "Kill Session", "Rename Session", "List Sessions", "Save Session", "Restore Session", "Import Session", "Export Session", "Quit"}
+	} else {
+		m.Choices = m.Filter.GetFiltered()
+	}
+
+	return m, cmd
+}
+
+// handleSelection processa a seleção do menu
+func (m *MenuModel) handleSelection() tea.Cmd {
+	choice := m.Choices[m.Cursor]
+	switch choice {
 	case "New Session":
-		return NewTextInput("New Session Name", "new", ""), nil
-
+		return func() tea.Msg { return NewSessionMsg{} }
 	case "Switch Session":
-		return NewSwitchModel(), nil
-
-	case "Kill Sessions":
-		return NewKillModel(), nil
-
-	case "Rename Current Session":
-		current, _ := GetCurrentSession()
-		return NewTextInput("New name for: "+current, "rename", current), nil
-
-	case "List Active Sessions":
-		return NewInformationModel(renderSessionList()), nil
-
-	case "Save Current Session":
-		return NewTextInput("Save session name", "save", ""), nil
-
-	case "Restore Saved Session":
-		return NewTextInput("Restore saved session name", "restore", ""), nil
-
-	case "List Saved Sessions":
-		return NewInformationModel(renderSavedSessionList()), nil
-
-	case "Show Version":
-		return NewInformationModel(renderVersion()), nil
-
-	case "Show Config":
-		return NewInformationModel(renderConfig()), nil
-
+		return func() tea.Msg { return SwitchSessionMsg{} }
+	case "Kill Session":
+		return func() tea.Msg { return KillSessionMsg{} }
+	case "Rename Session":
+		return func() tea.Msg { return RenameSessionMsg{} }
+	case "List Sessions":
+		return func() tea.Msg { return ListSessionsMsg{} }
+	case "Save Session":
+		return func() tea.Msg { return SaveSessionMsg{} }
+	case "Restore Session":
+		return func() tea.Msg { return RestoreSessionMsg{} }
+	case "Import Session":
+		return func() tea.Msg { return ImportSessionMsg{} }
+	case "Export Session":
+		return func() tea.Msg { return ExportSessionMsg{} }
 	case "Quit":
-		return m, tea.Quit
+		m.Quit = true
+		return tea.Quit
 	}
-
-	return m, nil
+	return nil
 }
 
-func (m MenuModel) View() string {
-	var s strings.Builder
-	s.WriteString(TitleStyle.Render("🚀 TMS - Tmux Session Manager") + "\n\n")
+// View implementa tea.Model
+func (m *MenuModel) View() string {
+	if m.Quit {
+		return ""
+	}
 
-	for i, option := range menuOptions {
-		if i == m.cursor {
-			s.WriteString(SelectedStyle.Render(" → "+option) + "\n")
-		} else {
-			s.WriteString(ItemStyle.Render("   "+option) + "\n")
+	var b strings.Builder
+
+	// Título
+	titleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00FF00")).
+		Bold(true).
+		MarginBottom(1)
+
+	b.WriteString(titleStyle.Render("🚀 tms - Tmux Session Manager"))
+	b.WriteString("\n\n")
+
+	// Barra de filtro
+	if m.FilterActive {
+		filterView := m.Filter.View()
+		if filterView != "" {
+			filterStyle := lipgloss.NewStyle().
+				Background(lipgloss.Color("#333333")).
+				Padding(0, 1).
+				MarginBottom(1)
+			b.WriteString(filterStyle.Render(filterView))
+			b.WriteString("\n\n")
 		}
 	}
 
-	s.WriteString("\n" + HelpStyle.Render("↑↓/jk • Enter = select • q = quit"))
-	return s.String()
+	// Lista de itens
+	for i, choice := range m.Choices {
+		cursor := " "
+		if m.Cursor == i {
+			cursor = ">"
+		}
+
+		style := lipgloss.NewStyle()
+		if m.Cursor == i {
+			style = style.Foreground(lipgloss.Color("#00FF00")).Bold(true)
+		}
+
+		item := fmt.Sprintf("%s %s", cursor, choice)
+		b.WriteString(style.Render(item))
+		b.WriteString("\n")
+	}
+
+	// Dicas de teclado
+	helpStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#666666")).
+		MarginTop(1)
+
+	help := "↑/↓: navigate • enter: select • q: quit • /: filter"
+	if m.FilterActive {
+		help = "🔍 filter mode: type to search • enter: select • esc: cancel"
+	}
+	b.WriteString(helpStyle.Render(help))
+
+	return b.String()
 }
+
+// ========== MENSAGENS PARA COMANDOS ==========
+
+type NewSessionMsg struct{}
+type SwitchSessionMsg struct{}
+type KillSessionMsg struct{}
+type RenameSessionMsg struct{}
+type ListSessionsMsg struct{}
+type SaveSessionMsg struct{}
+type RestoreSessionMsg struct{}
+type ImportSessionMsg struct{}
+type ExportSessionMsg struct{}

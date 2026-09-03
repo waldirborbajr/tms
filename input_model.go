@@ -4,104 +4,127 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-// TextInputModel handles user text input in the TUI
-type TextInputModel struct {
-	prompt  string
-	value   string
-	action  string // "new", "rename", etc.
-	oldName string // used for rename operations
+// InputModel é um modelo para entrada de texto
+type InputModel struct {
+	Prompt     string
+	Value      string
+	Done       bool
+	Cancelled  bool
+	OnSubmit   func(string) tea.Cmd
+	OnCancel   func() tea.Cmd
+	Placeholder string
 }
 
-// NewTextInput creates a new text input model
-func NewTextInput(prompt, action, oldName string) TextInputModel {
-	return TextInputModel{
-		prompt:  prompt,
-		value:   "",
-		action:  action,
-		oldName: oldName,
+// NewInputModel cria um novo modelo de entrada
+func NewInputModel(prompt string) *InputModel {
+	return &InputModel{
+		Prompt:     prompt,
+		Value:      "",
+		Done:       false,
+		Cancelled:  false,
+		Placeholder: "digite o nome...",
 	}
 }
 
-func (t TextInputModel) Init() tea.Cmd {
+// Init implementa tea.Model
+func (m *InputModel) Init() tea.Cmd {
 	return nil
 }
 
-func (t TextInputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update implementa tea.Model
+func (m *InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.Done || m.Cancelled {
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc":
-			return NewMenuModel(), nil
-
 		case "enter":
-			if t.value == "" {
-				return t, nil
+			if m.Value != "" {
+				m.Done = true
+				if m.OnSubmit != nil {
+					return m, m.OnSubmit(m.Value)
+				}
+				return m, tea.Quit
 			}
+			return m, nil
 
-				if err := ValidateSessionName(t.value); err != nil {
-					TmuxDisplay("Invalid session name: " + err.Error())
-					return t, nil
-				}
+		case "esc", "ctrl+c":
+			m.Cancelled = true
+			if m.OnCancel != nil {
+				return m, m.OnCancel()
+			}
+			return m, tea.Quit
 
-				cfg := GetConfig()
-				switch t.action {
-				case "new":
-					if err := CreateSession(t.value); err != nil {
-						TmuxDisplay("Failed to create session: " + err.Error())
-						return NewMenuModel(), nil
-					}
-					if cfg.AutoSwitch {
-						if err := SwitchSession(t.value); err != nil {
-							TmuxDisplay("Created session but failed to switch: " + err.Error())
-							return NewMenuModel(), nil
-						}
-					}
-					TmuxDisplay("Created session: " + t.value)
-
-				case "rename":
-					if t.oldName != "" {
-						if err := RenameSession(t.oldName, t.value); err != nil {
-							TmuxDisplay("Failed to rename session: " + err.Error())
-							return NewMenuModel(), nil
-						}
-						TmuxDisplay("Renamed: " + t.oldName + " → " + t.value)
-					}
-
-				case "save":
-					if err := SaveSession(t.value, cfg.DefaultDirectory); err != nil {
-						TmuxDisplay("Failed to save session: " + err.Error())
-						return NewMenuModel(), nil
-					}
-					TmuxDisplay("Saved session definition: " + t.value)
-
-				case "restore":
-					if err := RestoreSession(t.value); err != nil {
-						TmuxDisplay("Failed to restore session: " + err.Error())
-						return NewMenuModel(), nil
-					}
-					TmuxDisplay("Restored session: " + t.value)
-				}
-				return NewMenuModel(), nil
 		case "backspace":
-			if len(t.value) > 0 {
-				t.value = t.value[:len(t.value)-1]
+			if len(m.Value) > 0 {
+				m.Value = m.Value[:len(m.Value)-1]
 			}
+			return m, nil
 
 		default:
+			// Adicionar caractere
 			if len(msg.String()) == 1 {
-				t.value += msg.String()
+				m.Value += msg.String()
 			}
+			return m, nil
 		}
 	}
-	return t, nil
+	return m, nil
 }
 
-func (t TextInputModel) View() string {
-	var s strings.Builder
-	s.WriteString(TitleStyle.Render("✏️ "+t.prompt) + "\n\n")
-	s.WriteString(InputStyle.Render(" > "+t.value+"█") + "\n\n")
-	s.WriteString(HelpStyle.Render("Type name • Enter = confirm • Esc = cancel"))
-	return s.String()
+// View implementa tea.Model
+func (m *InputModel) View() string {
+	if m.Done || m.Cancelled {
+		return ""
+	}
+
+	var b strings.Builder
+
+	promptStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00FF00")).
+		Bold(true)
+
+	b.WriteString(promptStyle.Render(m.Prompt))
+	b.WriteString("\n\n")
+
+	if m.Value == "" {
+		placeholderStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#666666")).
+			Italic(true)
+		b.WriteString(placeholderStyle.Render(m.Placeholder))
+	} else {
+		valueStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFFFF"))
+		b.WriteString(valueStyle.Render(m.Value))
+	}
+
+	b.WriteString("▌")
+
+	helpStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#666666")).
+		MarginTop(1)
+
+	b.WriteString(helpStyle.Render("\n\nenter: confirm • esc: cancel"))
+
+	return b.String()
+}
+
+// GetValue retorna o valor da entrada
+func (m *InputModel) GetValue() string {
+	return m.Value
+}
+
+// IsDone retorna se a entrada foi concluída
+func (m *InputModel) IsDone() bool {
+	return m.Done
+}
+
+// IsCancelled retorna se a entrada foi cancelada
+func (m *InputModel) IsCancelled() bool {
+	return m.Cancelled
 }
