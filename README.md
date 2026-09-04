@@ -1,4 +1,9 @@
-# TMS — Tmux Session Manager
+<p align="center">
+  <img width="256" height="256" src="./assets/logo.png" />
+</p>
+
+<h1 align="center">TMS — Tmux Session Manager</h1>
+
 
 A clean, fast, and modern tmux session manager written in Go.
 
